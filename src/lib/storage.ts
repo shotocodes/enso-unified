@@ -1,153 +1,60 @@
 // ================================================
-// ENSO Unified - 統合ストレージ
+// ENSO Unified - Storage dispatcher (public API)
 // ================================================
 //
-// セキュリティ原則:
-//  - データは全てクライアント側 localStorage のみに保存
-//  - サーバー送信は AI 生成エンドポイント経由（入力テキストのみ）
-//  - 個人情報 / APIキー / シークレットは保存しない
+// Thin facade that:
+//   1) Reads/writes through `store/local.ts` (localStorage)
+//   2) When `setSyncUserId(userId)` has been called (i.e. logged in), also
+//      fires-and-forgets the write to Supabase via `store/sync.ts`.
 //
-// localStorageキー体系（既存ユーザーのデータ互換を保つため変更しない）:
-//  TIMER  : enso-life-config, enso-goals, enso-notified-goals, enso-sound-settings
-//  FOCUS  : enso-focus-sessions, enso-focus-timer-config, enso-focus-tags,
-//           enso-focus-completion-sound, enso-focus-ambient, enso-focus-daily-goal
-//  TASK   : enso-task-tasks, enso-task-milestones
-//  JOURNAL: enso-journal-entries, enso-journal-onboarded
-//  UNIFIED: enso-theme, enso-locale, enso-last-backup-reminder
+// The public API is unchanged, so no component has to be updated.
 
 import type {
   AmbientSettings, CompletionSoundType, CustomTag, DailyGoal, DailyJournal,
-  EnsoTask, FocusSession, Goal, LifeConfig, Locale, ManualEntry, Milestone,
-  NotifyTiming, SoundSettings, Task, ThemeMode, TimerConfig,
+  FocusSession, Goal, LifeConfig, Locale, Milestone, NotifyTiming, SoundSettings,
+  Task, ThemeMode, TimerConfig,
 } from "@/types";
-import { DEFAULT_TAGS, DEFAULT_TIMER_CONFIG } from "@/types";
+import * as local from "./store/local";
+import * as sync from "./store/sync";
+
+// Re-export everything from local for read-only helpers + types
+export type { GoalInfo } from "./store/local";
+export type { ExportBundle } from "./store/local";
+export { KEYS, migrateLegacyStorage } from "./store/local";
 
 // ================================================
-// Storage keys (central registry — keeps app compatibility)
+// Current signed-in user (set by AppShell)
 // ================================================
 
-export const KEYS = {
-  // TIMER
-  lifeConfig: "enso-life-config",
-  goals: "enso-goals",
-  notifiedGoals: "enso-notified-goals",
-  soundSettings: "enso-sound-settings",
+let currentUserId: string | null = null;
 
-  // FOCUS
-  focusSessions: "enso-focus-sessions",
-  focusTimerConfig: "enso-focus-timer-config",
-  focusTags: "enso-focus-tags",
-  focusCompletionSound: "enso-focus-completion-sound",
-  focusAmbient: "enso-focus-ambient",
-  focusDailyGoal: "enso-focus-daily-goal",
-
-  // TASK
-  taskTasks: "enso-task-tasks",
-  taskMilestones: "enso-task-milestones",
-
-  // JOURNAL
-  journalEntries: "enso-journal-entries",
-  journalOnboarded: "enso-journal-onboarded",
-
-  // UNIFIED
-  theme: "enso-theme",
-  locale: "enso-locale",
-  backupReminder: "enso-last-backup-reminder",
-} as const;
-
-// Legacy keys for one-shot migration
-const LEGACY_KEYS = {
-  "lifft-life-config": KEYS.lifeConfig,
-  "lifft-goals": KEYS.goals,
-  "lifft-notified-goals": KEYS.notifiedGoals,
-  "enso-timer-life-config": KEYS.lifeConfig,
-  "enso-gw-theme": KEYS.theme,
-  "enso-gw-locale": KEYS.locale,
-} as const;
-
-// ================================================
-// Primitive helpers (SSR-safe)
-// ================================================
-
-function isBrowser(): boolean {
-  return typeof window !== "undefined";
+export function setSyncUserId(userId: string | null): void {
+  currentUserId = userId;
 }
 
-function safeGet<T>(key: string): T | null {
-  if (!isBrowser()) return null;
-  try {
-    const raw = localStorage.getItem(key);
-    if (!raw) return null;
-    return JSON.parse(raw) as T;
-  } catch {
-    return null;
-  }
-}
-
-function safeSet(key: string, value: unknown): void {
-  if (!isBrowser()) return;
-  try {
-    localStorage.setItem(key, JSON.stringify(value));
-  } catch (e) {
-    console.error(`[storage] Failed to set ${key}:`, e);
-  }
-}
-
-function safeRemove(key: string): void {
-  if (!isBrowser()) return;
-  try {
-    localStorage.removeItem(key);
-  } catch {
-    /* noop */
-  }
-}
-
-function toLocalDateStr(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
-function getTodayString(): string {
-  return toLocalDateStr(new Date());
-}
-
-function getTodayStart(): number {
-  const now = new Date();
-  return new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+function user(): string | null {
+  return currentUserId;
 }
 
 // ================================================
-// Legacy migration (lifft-* → enso-*)
-// ================================================
-
-export function migrateLegacyStorage(): void {
-  if (!isBrowser()) return;
-  for (const [legacy, current] of Object.entries(LEGACY_KEYS)) {
-    const old = localStorage.getItem(legacy);
-    if (old !== null && !localStorage.getItem(current)) {
-      localStorage.setItem(current, old);
-      localStorage.removeItem(legacy);
-    }
-  }
-}
-
-// ================================================
-// Global settings (theme / locale)
+// Theme / locale (profile KV)
 // ================================================
 
 export function getTheme(): ThemeMode {
-  return (safeGet<ThemeMode>(KEYS.theme)) ?? "dark";
+  return local.getTheme();
 }
-
 export function saveTheme(theme: ThemeMode): void {
-  safeSet(KEYS.theme, theme);
+  local.saveTheme(theme);
+  const uid = user();
+  if (uid) sync.pushProfilePatch(uid, { theme });
 }
-
 export function getLocale(): Locale {
-  return (safeGet<Locale>(KEYS.locale)) ?? "ja";
+  return local.getLocale();
 }
-
 export function saveLocale(locale: Locale): void {
-  safeSet(KEYS.locale, locale);
+  local.saveLocale(locale);
+  const uid = user();
+  if (uid) sync.pushProfilePatch(uid, { locale });
 }
 
 // ================================================
@@ -155,11 +62,12 @@ export function saveLocale(locale: Locale): void {
 // ================================================
 
 export function getLifeConfig(): LifeConfig | null {
-  return safeGet<LifeConfig>(KEYS.lifeConfig);
+  return local.getLifeConfig();
 }
-
 export function saveLifeConfig(config: LifeConfig): void {
-  safeSet(KEYS.lifeConfig, config);
+  local.saveLifeConfig(config);
+  const uid = user();
+  if (uid) sync.pushProfilePatch(uid, { life_config: config });
 }
 
 // ================================================
@@ -167,465 +75,249 @@ export function saveLifeConfig(config: LifeConfig): void {
 // ================================================
 
 export function getGoals(): Goal[] {
-  return safeGet<Goal[]>(KEYS.goals) ?? [];
+  return local.getGoals();
 }
-
 export function saveGoals(goals: Goal[]): void {
-  safeSet(KEYS.goals, goals);
+  local.saveGoals(goals);
+  const uid = user();
+  if (uid) sync.pushGoals(uid, goals);
 }
-
 export function addGoal(goal: Omit<Goal, "id" | "createdAt">): Goal {
-  const newGoal: Goal = {
-    ...goal,
-    id: crypto.randomUUID(),
-    createdAt: new Date().toISOString(),
-  };
-  saveGoals([...getGoals(), newGoal]);
+  const newGoal = local.addGoal(goal);
+  const uid = user();
+  if (uid) sync.pushGoals(uid, [newGoal]);
   return newGoal;
 }
-
 export function updateGoal(
   id: string,
   updates: Partial<Pick<Goal, "title" | "deadline" | "notifyTimings">>
 ): void {
-  saveGoals(getGoals().map((g) => (g.id === id ? { ...g, ...updates } : g)));
-}
-
-export function deleteGoal(id: string): void {
-  saveGoals(getGoals().filter((g) => g.id !== id));
-}
-
-export function achieveGoal(id: string, memo?: string): Goal | null {
-  const goals = getGoals();
-  const idx = goals.findIndex((g) => g.id === id);
-  if (idx === -1) return null;
-  goals[idx] = {
-    ...goals[idx],
-    achievedAt: new Date().toISOString(),
-    ...(memo ? { memo } : {}),
-  };
-  saveGoals(goals);
-  return goals[idx];
-}
-
-export function unachieveGoal(id: string): void {
-  const goals = getGoals();
-  const idx = goals.findIndex((g) => g.id === id);
-  if (idx !== -1) {
-    const { achievedAt: _achievedAt, ...rest } = goals[idx];
-    void _achievedAt;
-    goals[idx] = rest as Goal;
-    saveGoals(goals);
+  local.updateGoal(id, updates);
+  const uid = user();
+  if (uid) {
+    const goals = local.getGoals();
+    sync.pushGoals(uid, goals);
   }
 }
-
+export function deleteGoal(id: string): void {
+  local.deleteGoal(id);
+  const uid = user();
+  if (uid) sync.pushGoalDelete(id);
+}
+export function achieveGoal(id: string, memo?: string): Goal | null {
+  const g = local.achieveGoal(id, memo);
+  const uid = user();
+  if (uid && g) sync.pushGoals(uid, [g]);
+  return g;
+}
+export function unachieveGoal(id: string): void {
+  local.unachieveGoal(id);
+  const uid = user();
+  if (uid) {
+    const goal = local.getGoals().find((g) => g.id === id);
+    if (goal) sync.pushGoals(uid, [goal]);
+  }
+}
 export function getActiveGoalsList(): Goal[] {
-  return getGoals().filter((g) => !g.achievedAt);
+  return local.getActiveGoalsList();
 }
-
 export function getAchievedGoals(): Goal[] {
-  return getGoals()
-    .filter((g) => g.achievedAt)
-    .sort((a, b) => (b.achievedAt! > a.achievedAt! ? 1 : -1));
+  return local.getAchievedGoals();
 }
-
 export function getDefaultNotifyTimings(deadlineISO: string): NotifyTiming[] {
-  const days = (new Date(deadlineISO).getTime() - Date.now()) / 86400000;
-  if (days <= 7) return ["3d", "1d", "1h", "0"];
-  return ["2w", "1w", "3d", "1d", "1h", "0"];
+  return local.getDefaultNotifyTimings(deadlineISO);
 }
 
 // ================================================
-// TIMER — Sound / Notifications
+// TIMER — Sound / notify
 // ================================================
-
-const DEFAULT_SOUND_SETTINGS: SoundSettings = {
-  enabled: false,
-  tickSound: "classic",
-  volume: 0.5,
-};
 
 export function getSoundSettings(): SoundSettings {
-  return { ...DEFAULT_SOUND_SETTINGS, ...(safeGet<SoundSettings>(KEYS.soundSettings) ?? {}) };
+  return local.getSoundSettings();
 }
-
 export function saveSoundSettings(settings: SoundSettings): void {
-  safeSet(KEYS.soundSettings, settings);
+  local.saveSoundSettings(settings);
+  const uid = user();
+  if (uid) sync.pushProfilePatch(uid, { sound_settings: settings });
 }
-
 export function getNotifiedKeys(): Set<string> {
-  return new Set(safeGet<string[]>(KEYS.notifiedGoals) ?? []);
+  return local.getNotifiedKeys();
 }
-
 export function addNotifiedKey(key: string): void {
-  const keys = getNotifiedKeys();
-  keys.add(key);
-  safeSet(KEYS.notifiedGoals, [...keys]);
+  local.addNotifiedKey(key);
+  // Notified keys are device-local — don't sync
 }
 
 // ================================================
-// FOCUS — Sessions
+// FOCUS — sessions
 // ================================================
 
 export function getFocusSessions(): FocusSession[] {
-  return safeGet<FocusSession[]>(KEYS.focusSessions) ?? [];
+  return local.getFocusSessions();
 }
-
 export function saveFocusSessions(sessions: FocusSession[]): void {
-  safeSet(KEYS.focusSessions, sessions);
+  local.saveFocusSessions(sessions);
+  const uid = user();
+  if (uid) sync.pushFocusSessions(uid, sessions);
 }
-
 export function addFocusSession(session: Omit<FocusSession, "id">): FocusSession {
-  const newSession: FocusSession = { ...session, id: crypto.randomUUID() };
-  saveFocusSessions([...getFocusSessions(), newSession]);
-  return newSession;
+  const added = local.addFocusSession(session);
+  const uid = user();
+  if (uid) sync.pushFocusSessions(uid, [added]);
+  return added;
 }
-
 export function clearFocusSessions(): void {
-  safeSet(KEYS.focusSessions, []);
+  local.clearFocusSessions();
+  // TODO(v2): also clear on Supabase — for now caller handles it
 }
 
-// FOCUS — stats
-export interface FocusStats {
-  today: number;
-  week: number;
-  month: number;
-  total: number;
-  totalSessions: number;
-}
+export type FocusStats = local.FocusStats;
+export const getFocusStats = local.getFocusStats;
+export const getStats = local.getStats;
+export const getSessions = local.getSessions;
+export const clearSessions = local.clearSessions;
+export const addSession = local.addSession;
 
-export function getFocusStats(): FocusStats {
-  const sessions = getFocusSessions();
-  const todayStart = getTodayStart();
-  const weekStart = todayStart - 6 * 86400000;
-  const monthStart = todayStart - 29 * 86400000;
-
-  let today = 0, week = 0, month = 0, total = 0;
-  for (const s of sessions) {
-    const ended = new Date(s.endedAt).getTime();
-    total += s.duration;
-    if (ended >= monthStart) month += s.duration;
-    if (ended >= weekStart) week += s.duration;
-    if (ended >= todayStart) today += s.duration;
-  }
-  return { today, week, month, total, totalSessions: sessions.length };
-}
-
-// FOCUS — daily breakdown / streak / tag stats
-function startOfDay(d: Date): Date { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; }
-
-export function getDailyStats(days: number = 7): { date: string; duration: number }[] {
-  const sessions = getFocusSessions();
-  const now = new Date();
-  const out: { date: string; duration: number }[] = [];
-  for (let i = days - 1; i >= 0; i--) {
-    const d = new Date(now); d.setDate(d.getDate() - i);
-    const ds = toLocalDateStr(d);
-    const dayStart = startOfDay(d).getTime();
-    const dayEnd = dayStart + 86400000;
-    let duration = 0;
-    for (const s of sessions) {
-      const t = new Date(s.endedAt).getTime();
-      if (t >= dayStart && t < dayEnd) duration += s.duration;
-    }
-    out.push({ date: ds, duration });
-  }
-  return out;
-}
-
-export function getStreak(): number {
-  const sessions = getFocusSessions();
-  if (sessions.length === 0) return 0;
-  const daysWithSessions = new Set<string>();
-  for (const s of sessions) daysWithSessions.add(toLocalDateStr(new Date(s.endedAt)));
-  const d = new Date();
-  if (!daysWithSessions.has(toLocalDateStr(d))) d.setDate(d.getDate() - 1);
-  let streak = 0;
-  while (daysWithSessions.has(toLocalDateStr(d))) {
-    streak++; d.setDate(d.getDate() - 1);
-  }
-  return streak;
-}
-
-export function getTagStats(): Record<string, number> {
-  const sessions = getFocusSessions();
-  const result: Record<string, number> = {};
-  for (const s of sessions) {
-    const key = s.tag || "none";
-    result[key] = (result[key] || 0) + s.duration;
-  }
-  return result;
-}
-
-// Aliases used by the legacy FOCUS code paths
-export const getStats = getFocusStats;
-export const getSessions = getFocusSessions;
-export const clearSessions = clearFocusSessions;
-export const addSession = addFocusSession;
-export const getTags = getFocusTags;
-export const saveTags = saveFocusTags;
-
-// FOCUS — config, tags, sounds, daily goal
+// FOCUS — config / tags / sounds / daily goal
 export function getTimerConfig(): TimerConfig {
-  return { ...DEFAULT_TIMER_CONFIG, ...(safeGet<TimerConfig>(KEYS.focusTimerConfig) ?? {}) };
+  return local.getTimerConfig();
 }
-export function saveTimerConfig(c: TimerConfig): void { safeSet(KEYS.focusTimerConfig, c); }
-
+export function saveTimerConfig(c: TimerConfig): void {
+  local.saveTimerConfig(c);
+  const uid = user();
+  if (uid) sync.pushProfilePatch(uid, { timer_config: c });
+}
 export function getFocusTags(): CustomTag[] {
-  return safeGet<CustomTag[]>(KEYS.focusTags) ?? DEFAULT_TAGS;
+  return local.getFocusTags();
 }
-export function saveFocusTags(tags: CustomTag[]): void { safeSet(KEYS.focusTags, tags); }
-
+export function saveFocusTags(tags: CustomTag[]): void {
+  local.saveFocusTags(tags);
+  const uid = user();
+  if (uid) sync.pushProfilePatch(uid, { focus_tags: tags });
+}
+export const getTags = local.getTags;
+export const saveTags = saveFocusTags;
 export function getCompletionSound(): CompletionSoundType {
-  return safeGet<CompletionSoundType>(KEYS.focusCompletionSound) ?? "celebration";
+  return local.getCompletionSound();
 }
-export function saveCompletionSound(s: CompletionSoundType): void { safeSet(KEYS.focusCompletionSound, s); }
-
+export function saveCompletionSound(s: CompletionSoundType): void {
+  local.saveCompletionSound(s);
+  const uid = user();
+  if (uid) sync.pushProfilePatch(uid, { completion_sound: s });
+}
 export function getAmbientSettings(): AmbientSettings {
-  return safeGet<AmbientSettings>(KEYS.focusAmbient) ?? { enabled: false, type: "thunder", volume: 0.3 };
+  return local.getAmbientSettings();
 }
-export function saveAmbientSettings(s: AmbientSettings): void { safeSet(KEYS.focusAmbient, s); }
-
+export function saveAmbientSettings(s: AmbientSettings): void {
+  local.saveAmbientSettings(s);
+  const uid = user();
+  if (uid) sync.pushProfilePatch(uid, { ambient_settings: s });
+}
 export function getDailyGoal(): DailyGoal {
-  return safeGet<DailyGoal>(KEYS.focusDailyGoal) ?? { minutes: 0 };
+  return local.getDailyGoal();
 }
-export function saveDailyGoal(g: DailyGoal): void { safeSet(KEYS.focusDailyGoal, g); }
+export function saveDailyGoal(g: DailyGoal): void {
+  local.saveDailyGoal(g);
+  const uid = user();
+  if (uid) sync.pushProfilePatch(uid, { daily_goal: g });
+}
+
+// FOCUS — read-only stats helpers
+export const getDailyStats = local.getDailyStats;
+export const getStreak = local.getStreak;
+export const getTagStats = local.getTagStats;
 
 // ================================================
-// TASK — Tasks & Milestones
+// TASK
 // ================================================
 
 export function getTasks(): Task[] {
-  return safeGet<Task[]>(KEYS.taskTasks) ?? [];
+  return local.getTasks();
 }
-export function saveTasks(tasks: Task[]): void { safeSet(KEYS.taskTasks, tasks); }
-
+export function saveTasks(tasks: Task[]): void {
+  local.saveTasks(tasks);
+  const uid = user();
+  if (uid) sync.pushTasks(uid, tasks);
+}
 export function getMilestones(): Milestone[] {
-  return safeGet<Milestone[]>(KEYS.taskMilestones) ?? [];
+  return local.getMilestones();
 }
-export function saveMilestones(m: Milestone[]): void { safeSet(KEYS.taskMilestones, m); }
-
-// Tasks consumed by FOCUS (filter: active & not completed)
-export function getEnsoTasksForFocus(): EnsoTask[] {
-  const tasks = getTasks();
-  return tasks
-    .filter((t) => !t.completed && (!t.goalId || t.active === true))
-    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
-    .map(({ id, title, priority, completed }) => ({ id, title, priority, completed }));
+export function saveMilestones(m: Milestone[]): void {
+  local.saveMilestones(m);
+  const uid = user();
+  if (uid) sync.pushMilestones(uid, m);
+}
+export function getEnsoTasksForFocus() {
+  return local.getEnsoTasksForFocus();
 }
 
 // ================================================
-// JOURNAL — Entries
+// JOURNAL
 // ================================================
 
 export function getJournalEntries(): DailyJournal[] {
-  return safeGet<DailyJournal[]>(KEYS.journalEntries) ?? [];
+  return local.getJournalEntries();
 }
 export function saveJournalEntries(entries: DailyJournal[]): void {
-  safeSet(KEYS.journalEntries, entries);
+  local.saveJournalEntries(entries);
+  const uid = user();
+  if (uid) sync.pushJournalEntries(uid, entries);
 }
-
-// Shared helper: append a manual entry to today's journal
-function appendTodayEntry(text: string, icon: ManualEntry["icon"]): void {
-  if (!isBrowser()) return;
-  const now = new Date();
-  const todayStr = toLocalDateStr(now);
-  const timeStr = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
-  const entries = getJournalEntries();
-
-  const existing = entries.find((e) => e.date === todayStr);
-  const newActivity: ManualEntry = {
-    id: Date.now().toString(),
-    time: timeStr,
-    text,
-    icon,
-  };
-
-  if (existing) {
-    existing.manualEntries = existing.manualEntries ?? [];
-    existing.manualEntries.push(newActivity);
-    existing.updatedAt = now.toISOString();
-  } else {
-    entries.unshift({
-      date: todayStr,
-      notes: [],
-      manualEntries: [newActivity],
-      createdAt: now.toISOString(),
-      updatedAt: now.toISOString(),
-    });
-  }
-  saveJournalEntries(entries);
-}
-
-// Called from FOCUS on session completion
 export function recordFocusToJournal(label: string, durationMin: number): void {
-  appendTodayEntry(`${label} (${durationMin}min)`, "focus");
+  local.recordFocusToJournal(label, durationMin);
+  const uid = user();
+  if (uid) {
+    // Re-push today's entry only
+    const today = local.getJournalEntries().slice(0, 1);
+    sync.pushJournalEntries(uid, today);
+  }
 }
-
-// Called from TASK on task completion
 export function recordTaskToJournal(title: string): void {
-  appendTodayEntry(title, "done");
-}
-
-// ================================================
-// Dashboard aggregates (read-only views)
-// ================================================
-
-export function getFocusTodayMinutes(): number {
-  const sessions = getFocusSessions();
-  const todayStart = getTodayStart();
-  return (
-    sessions.filter((s) => new Date(s.endedAt).getTime() >= todayStart)
-      .reduce((sum, s) => sum + s.duration, 0) / 60
-  );
-}
-
-export function getFocusStreak(): number {
-  const sessions = getFocusSessions();
-  if (sessions.length === 0) return 0;
-  const sessionDates = new Set(
-    sessions.map((s) => toLocalDateStr(new Date(s.endedAt)))
-  );
-  let streak = 0;
-  const check = new Date();
-  check.setHours(0, 0, 0, 0);
-  if (!sessionDates.has(toLocalDateStr(check))) {
-    check.setDate(check.getDate() - 1);
+  local.recordTaskToJournal(title);
+  const uid = user();
+  if (uid) {
+    const today = local.getJournalEntries().slice(0, 1);
+    sync.pushJournalEntries(uid, today);
   }
-  while (sessionDates.has(toLocalDateStr(check))) {
-    streak++;
-    check.setDate(check.getDate() - 1);
-  }
-  return streak;
-}
-
-export function getTaskStats(): { active: number; completedToday: number } {
-  const tasks = getTasks();
-  const todayStr = getTodayString();
-  return {
-    active: tasks.filter((t) => !t.completed).length,
-    completedToday: tasks.filter(
-      (t) => t.completed && t.completedAt && t.completedAt.startsWith(todayStr)
-    ).length,
-  };
-}
-
-export interface GoalInfo {
-  title: string;
-  daysLeft: number;
-}
-
-export function getActiveGoalsInfo(): GoalInfo[] {
-  const now = Date.now();
-  return getActiveGoalsList()
-    .map((g) => ({
-      title: g.title,
-      daysLeft: Math.max(0, Math.ceil((new Date(g.deadline).getTime() - now) / 86400000)),
-    }))
-    .sort((a, b) => a.daysLeft - b.daysLeft);
-}
-
-export function getJournalToday(): { entries: number; mood: number | null } {
-  const journals = getJournalEntries();
-  const todayStr = getTodayString();
-  const today = journals.find((j) => j.date === todayStr);
-  if (!today) return { entries: 0, mood: null };
-  return {
-    entries: (today.manualEntries?.length ?? 0) + (today.notes?.length ?? 0),
-    mood: today.mood ?? null,
-  };
 }
 
 // ================================================
-// Onboarding / Backup reminder
+// Dashboard aggregates (read-only)
 // ================================================
 
-export function hasAnyData(): boolean {
-  return (
-    getGoals().length > 0 ||
-    getTasks().length > 0 ||
-    getFocusSessions().length > 0 ||
-    getJournalEntries().length > 0
-  );
-}
-
-const BACKUP_INTERVAL_DAYS = 7;
-
-export function shouldShowBackupReminder(): boolean {
-  if (!hasAnyData()) return false;
-  const last = safeGet<number>(KEYS.backupReminder);
-  if (!last) return true;
-  const daysSince = (Date.now() - last) / 86400000;
-  return daysSince >= BACKUP_INTERVAL_DAYS;
-}
-
-export function dismissBackupReminder(): void {
-  safeSet(KEYS.backupReminder, Date.now());
-}
+export const getFocusTodayMinutes = local.getFocusTodayMinutes;
+export const getFocusStreak = local.getFocusStreak;
+export const getTaskStats = local.getTaskStats;
+export const getActiveGoalsInfo = local.getActiveGoalsInfo;
+export const getActiveGoals = local.getActiveGoals;
+export const getJournalToday = local.getJournalToday;
 
 // ================================================
-// Unified Export / Import
+// Onboarding / backup
 // ================================================
 
-export interface ExportBundle {
-  version: "1.0";
-  exportedAt: string;
-  app: "enso-unified";
-  data: Record<string, unknown>;
-}
+export const hasAnyData = local.hasAnyData;
+export const shouldShowBackupReminder = local.shouldShowBackupReminder;
+export const dismissBackupReminder = local.dismissBackupReminder;
 
-export function exportAllData(): string {
-  const bundle: ExportBundle = {
-    version: "1.0",
-    exportedAt: new Date().toISOString(),
-    app: "enso-unified",
-    data: {},
-  };
-  for (const key of Object.values(KEYS)) {
-    const raw = isBrowser() ? localStorage.getItem(key) : null;
-    if (raw !== null) {
-      try {
-        bundle.data[key] = JSON.parse(raw);
-      } catch {
-        bundle.data[key] = raw;
-      }
-    }
-  }
-  return JSON.stringify(bundle, null, 2);
-}
+// ================================================
+// Import / Export / Clear
+// ================================================
 
+export const exportAllData = local.exportAllData;
 export function importAllData(json: string): boolean {
-  if (!isBrowser()) return false;
-  try {
-    const parsed = JSON.parse(json) as unknown;
-    // Accept both { version, data: {...} } bundle format and flat { key: value } format
-    const payload = (parsed && typeof parsed === "object" && "data" in (parsed as Record<string, unknown>))
-      ? (parsed as ExportBundle).data
-      : (parsed as Record<string, unknown>);
-
-    const validKeys = new Set<string>(Object.values(KEYS) as string[]);
-    for (const [key, val] of Object.entries(payload)) {
-      // Accept only known enso-* keys to avoid polluting localStorage
-      if (validKeys.has(key) || key.startsWith("enso-")) {
-        localStorage.setItem(key, JSON.stringify(val));
-      }
-    }
-    return true;
-  } catch {
-    return false;
-  }
+  const ok = local.importAllData(json);
+  // Caller should call pullAll() / performInitialSync() subsequently if signed in
+  return ok;
 }
-
 export function clearAllData(): void {
-  if (!isBrowser()) return;
-  for (const key of Object.values(KEYS)) {
-    localStorage.removeItem(key);
-  }
+  local.clearAllData();
+  // Note: does NOT clear cloud. User should explicitly delete their account for that.
 }
 
 // ================================================
-// Cross-app aliases (used by dashboard / onboarding)
+// Sync control (for AppShell)
 // ================================================
 
-// Alias for backward-compatible dashboard API
-export const getActiveGoals = getActiveGoalsInfo;
+export { performInitialSync, pullAll } from "./store/sync";
+export type { InitialSyncResult } from "./store/sync";

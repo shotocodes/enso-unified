@@ -39,7 +39,7 @@ const TICK_TYPES: TickSoundType[] = ["classic", "soft", "digital"];
 const THEMES: ThemeMode[] = ["dark", "light", "system"];
 
 export default function SettingsPage() {
-  const { locale, setLocale, theme, setTheme, mounted } = useAppShell();
+  const { locale, setLocale, theme, setTheme, mounted, user } = useAppShell();
 
   // Per-feature settings state (loaded from storage)
   const [tickSettings, setTickSettings] = useState<SoundSettings>({ enabled: false, tickSound: "classic", volume: 0.5 });
@@ -132,6 +132,45 @@ export default function SettingsPage() {
       </header>
 
       <div className="space-y-5 pb-6">
+        {/* Account */}
+        <Section title={t("settings.section.account", locale)} description={t("settings.section.account.desc", locale)}>
+          {user ? (
+            <div className="space-y-3">
+              <div className="flex items-center gap-3">
+                {user.user_metadata?.avatar_url && (
+                  <img
+                    src={user.user_metadata.avatar_url}
+                    alt=""
+                    className="w-8 h-8 rounded-full"
+                  />
+                )}
+                <div className="min-w-0 flex-1">
+                  <p className="text-[10px] text-muted uppercase tracking-wider">{t("settings.signedInAs", locale)}</p>
+                  <p className="text-xs truncate">{user.email}</p>
+                </div>
+              </div>
+              <form action="/auth/sign-out" method="post">
+                <button
+                  type="submit"
+                  className="w-full py-2 rounded-lg text-xs font-bold bg-subtle text-muted hover:opacity-80 transition-colors"
+                >
+                  {t("settings.signOut", locale)}
+                </button>
+              </form>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <p className="text-xs text-muted">{t("settings.notSignedIn", locale)}</p>
+              <Link
+                href="/auth/sign-in"
+                className="block text-center py-2.5 rounded-lg text-xs font-bold bg-emerald-500 text-white hover:bg-emerald-600 transition-colors"
+              >
+                {t("settings.signIn", locale)}
+              </Link>
+            </div>
+          )}
+        </Section>
+
         {/* Appearance */}
         <Section title={t("settings.section.appearance", locale)} description={t("settings.section.appearance.desc", locale)}>
           <Row label={t("settings.theme", locale)}>

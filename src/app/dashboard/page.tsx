@@ -56,7 +56,8 @@ const ONBOARD_STEPS = [
 ];
 
 export default function Dashboard() {
-  const { locale, mounted } = useAppShell();
+  const { locale, mounted, user, authReady } = useAppShell();
+  const [dismissSync, setDismissSync] = useState(false);
 
   const [isNewUser, setIsNewUser] = useState(false);
   const [focusMin, setFocusMin] = useState(0);
@@ -96,6 +97,34 @@ export default function Dashboard() {
       <PageHeader title="ENSO" subtitle={t("home.subtitle", locale)} />
 
       <div className="space-y-5">
+        {/* Sign-in banner (shown whenever not signed in — new users benefit most from cloud sync) */}
+        {mounted && authReady && !user && !dismissSync && (
+          <div className="animate-fade-in flex items-center gap-3 bg-card border border-emerald-500/20 rounded-xl px-4 py-3">
+            <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth={2} strokeLinecap="round" className="shrink-0">
+              <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
+              <circle cx="9" cy="7" r="4" />
+              <path d="M23 11l-4 4-4-4" />
+            </svg>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-medium">{t("sync.banner.title", locale)}</p>
+              <p className="text-[10px] text-muted mt-0.5">{t("sync.banner.desc", locale)}</p>
+            </div>
+            <div className="flex items-center gap-1 shrink-0">
+              <Link
+                href="/auth/sign-in"
+                className="text-xs text-emerald-500 hover:text-emerald-400 font-medium px-2 py-1"
+              >
+                {t("sync.banner.cta", locale)}
+              </Link>
+              <button
+                onClick={() => setDismissSync(true)}
+                className="text-muted hover:text-emerald-500 w-5 h-5 flex items-center justify-center rounded-md"
+                aria-label="Dismiss"
+              >×</button>
+            </div>
+          </div>
+        )}
+
         {/* Backup reminder */}
         {mounted && showBackup && !isNewUser && (
           <div className="animate-fade-in flex items-center gap-3 bg-card border border-amber-500/20 rounded-xl px-4 py-3">

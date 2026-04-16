@@ -5,6 +5,7 @@ import { taskTranslations } from "./i18n-data/task";
 import { focusTranslations } from "./i18n-data/focus";
 import { journalTranslations } from "./i18n-data/journal";
 import { settingsTranslations } from "./i18n-data/settings";
+import { authTranslations } from "./i18n-data/auth";
 
 export type { Locale };
 
@@ -23,6 +24,7 @@ const translations: Record<string, Record<Locale, string>> = {
   ...focusTranslations,
   ...journalTranslations,
   ...settingsTranslations,
+  ...authTranslations,
 };
 
 // Module-level locale cache for hooks/non-React calls that don't have locale prop

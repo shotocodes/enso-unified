@@ -2,16 +2,19 @@
 
 import { useEffect, useState, useCallback, createContext, useContext, useMemo } from "react";
 import { usePathname } from "next/navigation";
+import type { User } from "@supabase/supabase-js";
 import {
   getTheme, saveTheme, getLocale, saveLocale,
   migrateLegacyStorage,
+  setSyncUserId, performInitialSync, pullAll,
 } from "@/lib/storage";
 import { setLocale as setI18nLocale, type Locale } from "@/lib/i18n";
 import type { ThemeMode } from "@/types";
+import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import BottomNav from "./BottomNav";
 
 // ================================================
-// Theme + Locale Context
+// App Context: theme + locale + optional user
 // ================================================
 
 interface AppContextValue {
@@ -20,6 +23,8 @@ interface AppContextValue {
   locale: Locale;
   setLocale: (l: Locale) => void;
   mounted: boolean;
+  user: User | null;
+  authReady: boolean;
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
@@ -40,14 +45,17 @@ function applyTheme(theme: ThemeMode) {
 }
 
 // Routes that should render WITHOUT bottom nav.
-// All other routes get the nav.
-const NO_NAV_ROUTES = new Set(["/", "/guide"]);
+const NO_NAV_ROUTES = new Set(["/", "/guide", "/auth/sign-in"]);
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [theme, setThemeState] = useState<ThemeMode>("dark");
   const [locale, setLocaleState] = useState<Locale>("ja");
   const [mounted, setMounted] = useState(false);
+
+  // Auth state
+  const [user, setUser] = useState<User | null>(null);
+  const [authReady, setAuthReady] = useState(false);
 
   // Initial load (browser only)
   useEffect(() => {
@@ -60,9 +68,25 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     applyTheme(t);
     setMounted(true);
 
-    // Register unified service worker (production only — avoids dev cache pain)
     if ("serviceWorker" in navigator && process.env.NODE_ENV === "production") {
       navigator.serviceWorker.register("/sw.js").catch(() => {});
+    }
+
+    // Auth: subscribe to session changes. Does nothing if env vars are missing.
+    if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+      const supabase = createSupabaseBrowserClient();
+      // getSession reads the cookie directly — no network call, never throws on offline
+      supabase.auth.getSession().then(({ data }) => {
+        setUser(data.session?.user ?? null);
+        setAuthReady(true);
+      }).catch(() => setAuthReady(true));
+
+      const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+        setUser(session?.user ?? null);
+      });
+      return () => sub.subscription.unsubscribe();
+    } else {
+      setAuthReady(true);
     }
   }, []);
 
@@ -73,7 +97,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     saveTheme(theme);
   }, [theme, mounted]);
 
-  // Listen for system theme changes when in "system" mode
   useEffect(() => {
     if (theme !== "system") return;
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
@@ -89,19 +112,52 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     saveLocale(locale);
   }, [locale, mounted]);
 
+  // Cloud sync: register user with storage dispatcher, run initial sync on sign-in
+  useEffect(() => {
+    if (!mounted || !authReady) return;
+    setSyncUserId(user?.id ?? null);
+    if (!user) return;
+
+    let cancelled = false;
+    (async () => {
+      const result = await performInitialSync(user);
+      if (cancelled) return;
+      if (result.status === "downloaded") {
+        // Cloud data was pulled into local — re-read locale/theme so UI matches
+        setLocaleState(getLocale());
+        setThemeState(getTheme());
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [user, mounted, authReady]);
+
+  // Cloud refresh on focus/visibility when signed in (catches writes from other devices)
+  useEffect(() => {
+    if (!user || !mounted) return;
+    const refresh = () => pullAll();
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") refresh();
+    };
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [user, mounted]);
+
   const setTheme = useCallback((t: ThemeMode) => setThemeState(t), []);
   const setLocale = useCallback((l: Locale) => setLocaleState(l), []);
 
   const value = useMemo<AppContextValue>(
-    () => ({ theme, setTheme, locale, setLocale, mounted }),
-    [theme, setTheme, locale, setLocale, mounted]
+    () => ({ theme, setTheme, locale, setLocale, mounted, user, authReady }),
+    [theme, setTheme, locale, setLocale, mounted, user, authReady]
   );
 
   const showNav = !NO_NAV_ROUTES.has(pathname);
 
   return (
     <AppContext.Provider value={value}>
-      {/* Reserve space for bottom nav so content isn't covered */}
       <div className={showNav ? "pb-[calc(64px+env(safe-area-inset-bottom))]" : ""}>
         {children}
       </div>
