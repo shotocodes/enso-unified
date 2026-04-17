@@ -8,6 +8,7 @@ import {
   migrateLegacyStorage,
   setSyncUserId, performInitialSync, pullAll,
 } from "@/lib/storage";
+import { subscribeAll as subscribeRealtime } from "@/lib/store/realtime";
 import { setLocale as setI18nLocale, type Locale } from "@/lib/i18n";
 import type { ThemeMode } from "@/types";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
@@ -131,7 +132,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     return () => { cancelled = true; };
   }, [user, mounted, authReady]);
 
-  // Cloud refresh on focus/visibility when signed in (catches writes from other devices)
+  // Cloud refresh on focus/visibility when signed in (catches writes missed while disconnected)
   useEffect(() => {
     if (!user || !mounted) return;
     const refresh = () => pullAll();
@@ -144,6 +145,13 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       window.removeEventListener("focus", refresh);
       document.removeEventListener("visibilitychange", onVisibility);
     };
+  }, [user, mounted]);
+
+  // Realtime subscription: changes on other tabs/devices flow in live
+  useEffect(() => {
+    if (!user || !mounted) return;
+    const handle = subscribeRealtime(user.id);
+    return () => handle.unsubscribe();
   }, [user, mounted]);
 
   const setTheme = useCallback((t: ThemeMode) => setThemeState(t), []);

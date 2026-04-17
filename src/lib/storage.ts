@@ -16,6 +16,7 @@ import type {
 } from "@/types";
 import * as local from "./store/local";
 import * as sync from "./store/sync";
+import { markIntent } from "./store/realtime";
 
 // Re-export everything from local for read-only helpers + types
 export type { GoalInfo } from "./store/local";
@@ -46,7 +47,10 @@ export function getTheme(): ThemeMode {
 export function saveTheme(theme: ThemeMode): void {
   local.saveTheme(theme);
   const uid = user();
-  if (uid) sync.pushProfilePatch(uid, { theme });
+  if (uid) {
+    markIntent("profile");
+    sync.pushProfilePatch(uid, { theme });
+  }
 }
 export function getLocale(): Locale {
   return local.getLocale();
@@ -54,7 +58,10 @@ export function getLocale(): Locale {
 export function saveLocale(locale: Locale): void {
   local.saveLocale(locale);
   const uid = user();
-  if (uid) sync.pushProfilePatch(uid, { locale });
+  if (uid) {
+    markIntent("profile");
+    sync.pushProfilePatch(uid, { locale });
+  }
 }
 
 // ================================================
@@ -67,7 +74,10 @@ export function getLifeConfig(): LifeConfig | null {
 export function saveLifeConfig(config: LifeConfig): void {
   local.saveLifeConfig(config);
   const uid = user();
-  if (uid) sync.pushProfilePatch(uid, { life_config: config });
+  if (uid) {
+    markIntent("profile");
+    sync.pushProfilePatch(uid, { life_config: config });
+  }
 }
 
 // ================================================
@@ -78,14 +88,27 @@ export function getGoals(): Goal[] {
   return local.getGoals();
 }
 export function saveGoals(goals: Goal[]): void {
+  const previous = local.getGoals();
   local.saveGoals(goals);
   const uid = user();
-  if (uid) sync.pushGoals(uid, goals);
+  if (!uid) return;
+
+  const nextIds = new Set(goals.map((g) => g.id));
+  const deletedIds = previous.map((g) => g.id).filter((id) => !nextIds.has(id));
+
+  goals.forEach((g) => markIntent(`goals:${g.id}`));
+  deletedIds.forEach((id) => markIntent(`goals:${id}`));
+
+  if (goals.length > 0) sync.pushGoals(uid, goals);
+  if (deletedIds.length > 0) sync.pushGoalDeletes(deletedIds);
 }
 export function addGoal(goal: Omit<Goal, "id" | "createdAt">): Goal {
   const newGoal = local.addGoal(goal);
   const uid = user();
-  if (uid) sync.pushGoals(uid, [newGoal]);
+  if (uid) {
+    markIntent(`goals:${newGoal.id}`);
+    sync.pushGoals(uid, [newGoal]);
+  }
   return newGoal;
 }
 export function updateGoal(
@@ -95,6 +118,7 @@ export function updateGoal(
   local.updateGoal(id, updates);
   const uid = user();
   if (uid) {
+    markIntent(`goals:${id}`);
     const goals = local.getGoals();
     sync.pushGoals(uid, goals);
   }
@@ -102,12 +126,18 @@ export function updateGoal(
 export function deleteGoal(id: string): void {
   local.deleteGoal(id);
   const uid = user();
-  if (uid) sync.pushGoalDelete(id);
+  if (uid) {
+    markIntent(`goals:${id}`);
+    sync.pushGoalDelete(id);
+  }
 }
 export function achieveGoal(id: string, memo?: string): Goal | null {
   const g = local.achieveGoal(id, memo);
   const uid = user();
-  if (uid && g) sync.pushGoals(uid, [g]);
+  if (uid && g) {
+    markIntent(`goals:${id}`);
+    sync.pushGoals(uid, [g]);
+  }
   return g;
 }
 export function unachieveGoal(id: string): void {
@@ -115,7 +145,10 @@ export function unachieveGoal(id: string): void {
   const uid = user();
   if (uid) {
     const goal = local.getGoals().find((g) => g.id === id);
-    if (goal) sync.pushGoals(uid, [goal]);
+    if (goal) {
+      markIntent(`goals:${id}`);
+      sync.pushGoals(uid, [goal]);
+    }
   }
 }
 export function getActiveGoalsList(): Goal[] {
@@ -138,7 +171,10 @@ export function getSoundSettings(): SoundSettings {
 export function saveSoundSettings(settings: SoundSettings): void {
   local.saveSoundSettings(settings);
   const uid = user();
-  if (uid) sync.pushProfilePatch(uid, { sound_settings: settings });
+  if (uid) {
+    markIntent("profile");
+    sync.pushProfilePatch(uid, { sound_settings: settings });
+  }
 }
 export function getNotifiedKeys(): Set<string> {
   return local.getNotifiedKeys();
@@ -156,19 +192,33 @@ export function getFocusSessions(): FocusSession[] {
   return local.getFocusSessions();
 }
 export function saveFocusSessions(sessions: FocusSession[]): void {
+  const previous = local.getFocusSessions();
   local.saveFocusSessions(sessions);
   const uid = user();
-  if (uid) sync.pushFocusSessions(uid, sessions);
+  if (!uid) return;
+
+  const nextIds = new Set(sessions.map((s) => s.id));
+  const deletedIds = previous.map((s) => s.id).filter((id) => !nextIds.has(id));
+
+  sessions.forEach((s) => markIntent(`focus_sessions:${s.id}`));
+  deletedIds.forEach((id) => markIntent(`focus_sessions:${id}`));
+
+  if (sessions.length > 0) sync.pushFocusSessions(uid, sessions);
+  if (deletedIds.length > 0) sync.pushFocusSessionDeletes(deletedIds);
 }
 export function addFocusSession(session: Omit<FocusSession, "id">): FocusSession {
   const added = local.addFocusSession(session);
   const uid = user();
-  if (uid) sync.pushFocusSessions(uid, [added]);
+  if (uid) {
+    markIntent(`focus_sessions:${added.id}`);
+    sync.pushFocusSessions(uid, [added]);
+  }
   return added;
 }
 export function clearFocusSessions(): void {
   local.clearFocusSessions();
-  // TODO(v2): also clear on Supabase — for now caller handles it
+  const uid = user();
+  if (uid) sync.pushClearFocusSessions(uid);
 }
 
 export type FocusStats = local.FocusStats;
@@ -185,7 +235,10 @@ export function getTimerConfig(): TimerConfig {
 export function saveTimerConfig(c: TimerConfig): void {
   local.saveTimerConfig(c);
   const uid = user();
-  if (uid) sync.pushProfilePatch(uid, { timer_config: c });
+  if (uid) {
+    markIntent("profile");
+    sync.pushProfilePatch(uid, { timer_config: c });
+  }
 }
 export function getFocusTags(): CustomTag[] {
   return local.getFocusTags();
@@ -193,7 +246,10 @@ export function getFocusTags(): CustomTag[] {
 export function saveFocusTags(tags: CustomTag[]): void {
   local.saveFocusTags(tags);
   const uid = user();
-  if (uid) sync.pushProfilePatch(uid, { focus_tags: tags });
+  if (uid) {
+    markIntent("profile");
+    sync.pushProfilePatch(uid, { focus_tags: tags });
+  }
 }
 export const getTags = local.getTags;
 export const saveTags = saveFocusTags;
@@ -203,7 +259,10 @@ export function getCompletionSound(): CompletionSoundType {
 export function saveCompletionSound(s: CompletionSoundType): void {
   local.saveCompletionSound(s);
   const uid = user();
-  if (uid) sync.pushProfilePatch(uid, { completion_sound: s });
+  if (uid) {
+    markIntent("profile");
+    sync.pushProfilePatch(uid, { completion_sound: s });
+  }
 }
 export function getAmbientSettings(): AmbientSettings {
   return local.getAmbientSettings();
@@ -211,7 +270,10 @@ export function getAmbientSettings(): AmbientSettings {
 export function saveAmbientSettings(s: AmbientSettings): void {
   local.saveAmbientSettings(s);
   const uid = user();
-  if (uid) sync.pushProfilePatch(uid, { ambient_settings: s });
+  if (uid) {
+    markIntent("profile");
+    sync.pushProfilePatch(uid, { ambient_settings: s });
+  }
 }
 export function getDailyGoal(): DailyGoal {
   return local.getDailyGoal();
@@ -219,7 +281,10 @@ export function getDailyGoal(): DailyGoal {
 export function saveDailyGoal(g: DailyGoal): void {
   local.saveDailyGoal(g);
   const uid = user();
-  if (uid) sync.pushProfilePatch(uid, { daily_goal: g });
+  if (uid) {
+    markIntent("profile");
+    sync.pushProfilePatch(uid, { daily_goal: g });
+  }
 }
 
 // FOCUS — read-only stats helpers
@@ -235,17 +300,37 @@ export function getTasks(): Task[] {
   return local.getTasks();
 }
 export function saveTasks(tasks: Task[]): void {
+  const previous = local.getTasks();
   local.saveTasks(tasks);
   const uid = user();
-  if (uid) sync.pushTasks(uid, tasks);
+  if (!uid) return;
+
+  const nextIds = new Set(tasks.map((t) => t.id));
+  const deletedIds = previous.map((t) => t.id).filter((id) => !nextIds.has(id));
+
+  tasks.forEach((t) => markIntent(`tasks:${t.id}`));
+  deletedIds.forEach((id) => markIntent(`tasks:${id}`));
+
+  if (tasks.length > 0) sync.pushTasks(uid, tasks);
+  if (deletedIds.length > 0) sync.pushTaskDeletes(deletedIds);
 }
 export function getMilestones(): Milestone[] {
   return local.getMilestones();
 }
 export function saveMilestones(m: Milestone[]): void {
+  const previous = local.getMilestones();
   local.saveMilestones(m);
   const uid = user();
-  if (uid) sync.pushMilestones(uid, m);
+  if (!uid) return;
+
+  const nextIds = new Set(m.map((ms) => ms.id));
+  const deletedIds = previous.map((ms) => ms.id).filter((id) => !nextIds.has(id));
+
+  m.forEach((ms) => markIntent(`milestones:${ms.id}`));
+  deletedIds.forEach((id) => markIntent(`milestones:${id}`));
+
+  if (m.length > 0) sync.pushMilestones(uid, m);
+  if (deletedIds.length > 0) sync.pushMilestoneDeletes(deletedIds);
 }
 export function getEnsoTasksForFocus() {
   return local.getEnsoTasksForFocus();
@@ -259,16 +344,26 @@ export function getJournalEntries(): DailyJournal[] {
   return local.getJournalEntries();
 }
 export function saveJournalEntries(entries: DailyJournal[]): void {
+  const previous = local.getJournalEntries();
   local.saveJournalEntries(entries);
   const uid = user();
-  if (uid) sync.pushJournalEntries(uid, entries);
+  if (!uid) return;
+
+  const nextDates = new Set(entries.map((e) => e.date));
+  const deletedDates = previous.map((e) => e.date).filter((d) => !nextDates.has(d));
+
+  entries.forEach((e) => markIntent(`journal:${e.date}`));
+  deletedDates.forEach((d) => markIntent(`journal:${d}`));
+
+  if (entries.length > 0) sync.pushJournalEntries(uid, entries);
+  if (deletedDates.length > 0) sync.pushJournalDeletes(deletedDates);
 }
 export function recordFocusToJournal(label: string, durationMin: number): void {
   local.recordFocusToJournal(label, durationMin);
   const uid = user();
   if (uid) {
-    // Re-push today's entry only
     const today = local.getJournalEntries().slice(0, 1);
+    today.forEach((e) => markIntent(`journal:${e.date}`));
     sync.pushJournalEntries(uid, today);
   }
 }
@@ -277,6 +372,7 @@ export function recordTaskToJournal(title: string): void {
   const uid = user();
   if (uid) {
     const today = local.getJournalEntries().slice(0, 1);
+    today.forEach((e) => markIntent(`journal:${e.date}`));
     sync.pushJournalEntries(uid, today);
   }
 }

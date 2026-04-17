@@ -155,6 +155,30 @@ export function pushGoalDelete(id: string): void {
   safely(cloud.deleteGoalRemote(id), "pushGoalDelete");
 }
 
+export function pushGoalDeletes(ids: string[]): void {
+  safely(cloud.deleteGoalsRemote(ids), "pushGoalDeletes");
+}
+
+export function pushMilestoneDeletes(ids: string[]): void {
+  safely(cloud.deleteMilestonesRemote(ids), "pushMilestoneDeletes");
+}
+
+export function pushTaskDeletes(ids: string[]): void {
+  safely(cloud.deleteTasksRemote(ids), "pushTaskDeletes");
+}
+
+export function pushFocusSessionDeletes(ids: string[]): void {
+  safely(cloud.deleteFocusSessionsRemote(ids), "pushFocusSessionDeletes");
+}
+
+export function pushClearFocusSessions(userId: string): void {
+  safely(cloud.deleteAllFocusSessionsRemote(userId), "pushClearFocusSessions");
+}
+
+export function pushJournalDeletes(dates: string[]): void {
+  safely(cloud.deleteJournalEntriesRemote(dates), "pushJournalDeletes");
+}
+
 export function pushMilestones(userId: string, items: Milestone[]): void {
   safely(cloud.upsertMilestones(userId, items), "pushMilestones");
 }

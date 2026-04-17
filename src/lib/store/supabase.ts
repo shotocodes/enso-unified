@@ -116,6 +116,12 @@ export async function deleteGoalRemote(id: string): Promise<void> {
   if (error) console.warn("[supabase] deleteGoal:", error.message);
 }
 
+export async function deleteGoalsRemote(ids: string[]): Promise<void> {
+  if (ids.length === 0) return;
+  const { error } = await client().from("goals").delete().in("id", ids);
+  if (error) console.warn("[supabase] deleteGoals:", error.message);
+}
+
 // ================================================
 // Milestones
 // ================================================
@@ -169,6 +175,12 @@ export async function upsertMilestones(userId: string, items: Milestone[]): Prom
   if (items.length === 0) return;
   const { error } = await client().from("milestones").upsert(items.map((m) => milestoneToRow(userId, m)));
   if (error) console.warn("[supabase] upsertMilestones:", error.message);
+}
+
+export async function deleteMilestonesRemote(ids: string[]): Promise<void> {
+  if (ids.length === 0) return;
+  const { error } = await client().from("milestones").delete().in("id", ids);
+  if (error) console.warn("[supabase] deleteMilestones:", error.message);
 }
 
 // ================================================
@@ -244,6 +256,12 @@ export async function upsertTasks(userId: string, tasks: Task[]): Promise<void> 
   if (error) console.warn("[supabase] upsertTasks:", error.message);
 }
 
+export async function deleteTasksRemote(ids: string[]): Promise<void> {
+  if (ids.length === 0) return;
+  const { error } = await client().from("tasks").delete().in("id", ids);
+  if (error) console.warn("[supabase] deleteTasks:", error.message);
+}
+
 // ================================================
 // Focus sessions
 // ================================================
@@ -302,6 +320,17 @@ export async function upsertFocusSessions(userId: string, sessions: FocusSession
   if (error) console.warn("[supabase] upsertFocusSessions:", error.message);
 }
 
+export async function deleteFocusSessionsRemote(ids: string[]): Promise<void> {
+  if (ids.length === 0) return;
+  const { error } = await client().from("focus_sessions").delete().in("id", ids);
+  if (error) console.warn("[supabase] deleteFocusSessions:", error.message);
+}
+
+export async function deleteAllFocusSessionsRemote(userId: string): Promise<void> {
+  const { error } = await client().from("focus_sessions").delete().eq("user_id", userId);
+  if (error) console.warn("[supabase] deleteAllFocusSessions:", error.message);
+}
+
 // ================================================
 // Journal entries
 // ================================================
@@ -358,4 +387,10 @@ export async function upsertJournalEntries(userId: string, entries: DailyJournal
   if (entries.length === 0) return;
   const { error } = await client().from("journal_entries").upsert(entries.map((j) => journalToRow(userId, j)));
   if (error) console.warn("[supabase] upsertJournalEntries:", error.message);
+}
+
+export async function deleteJournalEntriesRemote(dates: string[]): Promise<void> {
+  if (dates.length === 0) return;
+  const { error } = await client().from("journal_entries").delete().in("date", dates);
+  if (error) console.warn("[supabase] deleteJournalEntries:", error.message);
 }

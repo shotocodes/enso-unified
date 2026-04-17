@@ -35,9 +35,11 @@ export default function TaskPage() {
       if (document.visibilityState === "visible") reload();
     };
     window.addEventListener("focus", reload);
+    window.addEventListener("enso:remote-change", reload);
     document.addEventListener("visibilitychange", onVisibility);
     return () => {
       window.removeEventListener("focus", reload);
+      window.removeEventListener("enso:remote-change", reload);
       document.removeEventListener("visibilitychange", onVisibility);
     };
   }, [reload]);

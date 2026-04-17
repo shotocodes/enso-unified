@@ -79,15 +79,17 @@ export default function Dashboard() {
 
   useEffect(() => { loadData(); }, [loadData]);
 
-  // Reload on tab focus
+  // Reload on tab focus / remote data changes
   useEffect(() => {
     const onVisibility = () => {
       if (document.visibilityState === "visible") loadData();
     };
     window.addEventListener("focus", loadData);
+    window.addEventListener("enso:remote-change", loadData);
     document.addEventListener("visibilitychange", onVisibility);
     return () => {
       window.removeEventListener("focus", loadData);
+      window.removeEventListener("enso:remote-change", loadData);
       document.removeEventListener("visibilitychange", onVisibility);
     };
   }, [loadData]);

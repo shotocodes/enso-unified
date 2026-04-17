@@ -112,8 +112,16 @@ function FocusInner() {
     const handleVisibility = () => {
       if (document.visibilityState === "visible") setEnsoTasks(getEnsoTasksForFocus());
     };
+    const handleRemoteChange = () => {
+      setEnsoTasks(getEnsoTasksForFocus());
+      setTodaySeconds(getFocusStats().today);
+    };
     document.addEventListener("visibilitychange", handleVisibility);
-    return () => document.removeEventListener("visibilitychange", handleVisibility);
+    window.addEventListener("enso:remote-change", handleRemoteChange);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibility);
+      window.removeEventListener("enso:remote-change", handleRemoteChange);
+    };
   }, [searchParams]);
 
   // Refresh today's seconds when sessionVersion changes
