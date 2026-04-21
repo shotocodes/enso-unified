@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useMemo } from "react";
+import Link from "next/link";
 import { type Locale, t, tFormat } from "@/lib/i18n";
 import type { Task, Priority, Goal, Milestone } from "@/types";
 import { PRIORITY_COLORS, PRIORITY_BG } from "@/types";
@@ -238,10 +239,10 @@ export default function TasksTab({ locale, tasks, milestones, goals, onTasksChan
             <p className="text-sm text-center">{tFormat("tasks.focusPrompt", locale, focusTask.title)}</p>
             <div className="flex gap-3">
               <button onClick={() => setFocusTask(null)} className="flex-1 py-2.5 rounded-xl text-sm bg-subtle text-muted hover:opacity-80">{t("tasks.close", locale)}</button>
-              <a href={`https://ensolife.app/focus?taskId=${focusTask.id}`}
+              <Link href={`/focus?taskId=${focusTask.id}`}
                 className="flex-1 py-2.5 rounded-xl text-sm font-bold bg-emerald-500 text-white hover:bg-emerald-600 transition-colors text-center">
                 {t("tasks.openFocus", locale)}
-              </a>
+              </Link>
             </div>
           </div>
         </div>
