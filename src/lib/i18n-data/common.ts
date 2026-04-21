@@ -89,7 +89,7 @@ export const commonTranslations: Record<string, Record<Locale, string>> = {
   "feature.free": { ja: "完全無料", en: "Completely Free", zh: "完全免费", ko: "완전 무료" },
   "feature.free.desc": { ja: "すべてのアプリが無料。アカウント登録も不要。", en: "All apps are free. No account needed.", zh: "所有应用免费。无需注册账号。", ko: "모든 앱이 무료. 계정 등록 불필요." },
   "feature.private": { ja: "プライバシー安全", en: "Privacy Safe", zh: "隐私安全", ko: "프라이버시 안전" },
-  "feature.private.desc": { ja: "データはあなたのブラウザにだけ保存。サーバーに送信されません。", en: "Data stays in your browser only. Nothing sent to servers.", zh: "数据仅保存在浏览器中。不会发送到服务器。", ko: "데이터는 브라우저에만 저장. 서버로 전송되지 않습니다." },
+  "feature.private.desc": { ja: "ログイン不要でブラウザに保存。Googleでログインすると全デバイスにリアルタイム同期。", en: "No login needed — saved to your browser. Sign in with Google to sync across all devices in real time.", zh: "无需登录，数据保存在浏览器中。使用Google登录可在所有设备间实时同步。", ko: "로그인 없이 브라우저에 저장. Google로 로그인하면 모든 기기에 실시간 동기화." },
   "feature.i18n": { ja: "4言語対応", en: "4 Languages", zh: "4种语言", ko: "4개 언어" },
   "feature.i18n.desc": { ja: "日本語・English・中文・한국어に対応。", en: "Japanese, English, Chinese, Korean.", zh: "支持日语・英语・中文・韩语。", ko: "일본어・영어・중국어・한국어 지원." },
   "feature.theme": { ja: "ダーク / ライトモード", en: "Dark / Light Mode", zh: "深色/浅色模式", ko: "다크/라이트 모드" },
@@ -108,9 +108,9 @@ export const commonTranslations: Record<string, Record<Locale, string>> = {
 
   // FAQ
   "faq.data.q": { ja: "データはどこに保存されていますか？", en: "Where is my data stored?", zh: "数据保存在哪里？", ko: "데이터는 어디에 저장되나요?" },
-  "faq.data.a": { ja: "ブラウザのローカルストレージに保存されます。他の人からは見えません。ブラウザのデータを削除すると消えるため、設定→データ→エクスポートでバックアップを取ることをおすすめします。", en: "Stored in your browser's local storage. Invisible to others. Clearing browser data erases it, so we recommend Settings → Data → Export to back up.", zh: "保存在浏览器的本地存储中。其他人看不到。清除浏览器数据会删除，建议在 设置 → 数据 → 导出 中备份。", ko: "브라우저의 로컬 스토리지에 저장됩니다. 다른 사람에게 보이지 않습니다. 브라우저 데이터 삭제 시 사라지므로 설정 → 데이터 → 내보내기에서 백업을 권장합니다." },
+  "faq.data.a": { ja: "未ログイン時はブラウザのローカルストレージに保存。Googleでログインするとクラウドに自動同期され、どのデバイスからでもアクセスできます。設定→データ→エクスポートでバックアップも取れます。", en: "Without login, data is stored in your browser's local storage. Sign in with Google to automatically sync to the cloud and access your data across all devices. You can also back up via Settings → Data → Export.", zh: "未登录时数据保存在浏览器本地存储中。使用Google登录后自动同步到云端，可跨设备访问。也可在设置→数据→导出中备份。", ko: "로그인하지 않으면 브라우저 로컬 스토리지에 저장됩니다. Google로 로그인하면 클라우드에 자동 동기화되어 모든 기기에서 접근 가능합니다. 설정 → 데이터 → 내보내기에서 백업도 가능합니다." },
   "faq.sync.q": { ja: "スマホとPCで同期できますか？", en: "Can I sync between phone and PC?", zh: "手机和电脑可以同步吗？", ko: "스마트폰과 PC에서 동기화할 수 있나요?" },
-  "faq.sync.a": { ja: "現在はデバイス間の自動同期には対応していません。設定→データ→エクスポート/インポート機能でデータを移行できます。近日中にGoogle認証+クラウド同期を追加予定。", en: "Auto-sync between devices is not supported yet. You can transfer data via Settings → Data → Export/Import. Google auth + cloud sync coming soon.", zh: "目前不支持设备间自动同步。可以通过 设置 → 数据 → 导出/导入 功能转移数据。即将添加Google认证和云同步。", ko: "현재 기기 간 자동 동기화는 지원하지 않습니다. 설정 → 데이터 → 내보내기/가져오기 기능으로 데이터를 이전할 수 있습니다. Google 인증과 클라우드 동기화가 곧 추가될 예정." },
+  "faq.sync.a": { ja: "Googleでログインすると、タブ間・デバイス間でリアルタイムに自動同期されます。ログイン不要でも設定→データ→エクスポート/インポートでデータを移行できます。", en: "Sign in with Google to sync automatically across tabs and devices in real time. Without login, you can still transfer data via Settings → Data → Export/Import.", zh: "使用Google登录后，标签页和设备之间会实时自动同步。不登录也可通过设置中的导出/导入功能转移数据。", ko: "Google로 로그인하면 탭 간, 기기 간에 실시간으로 자동 동기화됩니다. 로그인 없이도 설정 → 데이터 → 내보내기/가져오기로 데이터 이전이 가능합니다." },
   "faq.taskjournal.q": { ja: "TASKで完了したタスクがJOURNALに表示されるには？", en: "How do completed tasks appear in JOURNAL?", zh: "TASK中完成的任务如何显示在JOURNAL中？", ko: "TASK에서 완료한 작업이 JOURNAL에 표시되려면?" },
   "faq.taskjournal.a": { ja: "タスクを完了した瞬間に自動でJOURNALに記録されます。", en: "Completed tasks are automatically recorded in JOURNAL the moment you check them off.", zh: "完成任务的瞬间会自动记录到JOURNAL中。", ko: "작업을 완료하는 순간 자동으로 JOURNAL에 기록됩니다." },
   "faq.ai.q": { ja: "AI機能は何回使えますか？", en: "How many times can I use AI features?", zh: "AI功能可以使用多少次？", ko: "AI 기능은 몇 번 사용할 수 있나요?" },
