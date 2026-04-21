@@ -4,14 +4,54 @@ import { t } from "@/lib/i18n";
 import { TimerMode, TimerState, DailyGoal, EnsoTask, AmbientSoundType } from "@/types";
 import { PlayIcon, PauseIcon, SkipIcon, ExpandIcon, SpeakerOnIcon, SpeakerOffIcon } from "@/components/shared/Icons";
 
-const AMBIENT_ICONS: Record<AmbientSoundType, string> = {
-  thunder: "⛈",
-  fire: "🔥",
-  cafe: "☕",
-  birds: "🐦",
-  waves: "🌊",
-};
 const AMBIENT_TYPES: AmbientSoundType[] = ["thunder", "fire", "cafe", "birds", "waves"];
+
+function AmbientIcon({ type, size = 18 }: { type: AmbientSoundType; size?: number }) {
+  switch (type) {
+    case "thunder":
+      return (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="#f59e0b" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+          <path d="M19 16.9A5 5 0 0 0 18 7h-1.26a8 8 0 1 0-11.62 9" />
+          <polyline points="13 11 9 17 15 17 11 23" fill="#f59e0b" stroke="#f59e0b" />
+        </svg>
+      );
+    case "fire":
+      return (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="#f97316" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+          <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" fill="#f97316" />
+        </svg>
+      );
+    case "cafe":
+      return (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="#a16207" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+          <path d="M17 8h1a4 4 0 1 1 0 8h-1" />
+          <path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z" />
+          <line x1="6" x2="6" y1="2" y2="4" />
+          <line x1="10" x2="10" y1="2" y2="4" />
+          <line x1="14" x2="14" y1="2" y2="4" />
+        </svg>
+      );
+    case "birds":
+      return (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="#38bdf8" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+          <path d="M16 7h.01" />
+          <path d="M3.4 18H12a8 8 0 0 0 8-8V7a4 4 0 0 0-7.28-2.3L2 20" />
+          <path d="m20 7 2 .5-2 .5" />
+          <path d="M10 18v3" />
+          <path d="M14 17.75V21" />
+          <path d="M7 18a6 6 0 0 0 3.84-10.61" />
+        </svg>
+      );
+    case "waves":
+      return (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+          <path d="M2 6c.6.5 1.2 1 2.5 1C7 7 7 5 9.5 5c2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1" />
+          <path d="M2 12c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1" />
+          <path d="M2 18c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1" />
+        </svg>
+      );
+  }
+}
 
 interface TimerHandle {
   secondsLeft: number;
@@ -202,14 +242,14 @@ export default function FocusTab({ timer, focusMinutes, onFocusMinutesChange, on
                 <button
                   key={type}
                   onClick={() => onAmbientTypeChange(type)}
-                  className={`w-9 h-9 rounded-full flex items-center justify-center text-lg transition-all ${
+                  className={`w-9 h-9 rounded-full flex items-center justify-center transition-all ${
                     ambientType === type
-                      ? "bg-emerald-500/20 border border-emerald-500/40 scale-110"
-                      : "bg-card border border-card opacity-50 hover:opacity-100"
+                      ? "bg-card border border-emerald-500/40 scale-110"
+                      : "bg-card border border-card opacity-40 hover:opacity-80"
                   }`}
                   title={type}
                 >
-                  {AMBIENT_ICONS[type]}
+                  <AmbientIcon type={type} size={17} />
                 </button>
               ))}
             </div>

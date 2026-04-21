@@ -22,7 +22,11 @@ export async function startAmbient(type: AmbientSoundType | "break", volume: num
   const audio = new Audio(SOUND_FILES[type]);
   audio.loop = true;
   audio.volume = Math.max(0, Math.min(1, volume));
-  await audio.play();
+  try {
+    await audio.play();
+  } catch {
+    return;
+  }
   if (currentRequestId !== requestId) { audio.pause(); audio.src = ""; return; }
   audioEl = audio;
 }
