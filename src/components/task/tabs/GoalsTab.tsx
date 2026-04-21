@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import Link from "next/link";
 import { type Locale, t, tFormat } from "@/lib/i18n";
 import type { Goal, Milestone, Task, Priority } from "@/types";
 import { PRIORITY_COLORS } from "@/types";
@@ -155,9 +156,9 @@ export default function GoalsTab({ locale, milestones, onMilestonesChange, tasks
           <TargetIcon size={28} className="mx-auto text-muted opacity-40 mb-2" />
           <p className="text-sm text-muted">{t("goals.noGoals", locale)}</p>
           <p className="text-xs text-muted opacity-50">{t("goals.noGoalsHint", locale)}</p>
-          <a href="https://ensolife.app/timer" className="inline-block mt-2 px-4 py-2 rounded-xl text-sm font-medium bg-emerald-500 text-white hover:bg-emerald-600 transition-colors">
+          <Link href="/timer" className="inline-block mt-2 px-4 py-2 rounded-xl text-sm font-medium bg-emerald-500 text-white hover:bg-emerald-600 transition-colors">
             {t("goals.openTimer", locale)}
-          </a>
+          </Link>
         </div>
       ) : (
         <div className="space-y-4">

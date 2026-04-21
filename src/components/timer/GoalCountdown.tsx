@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { Goal, TimeUnit } from "@/types";
 import { t } from "@/lib/i18n";
 import { calcTimeRemaining, formatRelativeDate } from "@/lib/time";
@@ -116,12 +117,12 @@ export default function GoalCountdown({ goal, onEdit, onDelete, onAchieve, isJus
                 >
                   {t("goals.cancel")}
                 </button>
-                <a
-                  href="https://ensolife.app/task"
+                <Link
+                  href="/task"
                   className="flex-1 py-2.5 rounded-xl text-xs font-bold bg-emerald-500 text-white text-center hover:bg-emerald-600 transition-colors"
                 >
                   {t("goals.goToTask")}
-                </a>
+                </Link>
               </div>
             </div>
           </div>
