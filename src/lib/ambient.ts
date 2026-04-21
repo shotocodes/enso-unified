@@ -1,6 +1,6 @@
 import { AmbientSoundType } from "@/types";
 
-const BASE_PATH = "/focus";
+const BASE_PATH = "";
 
 const SOUND_FILES: Record<AmbientSoundType, string> = {
   thunder: `${BASE_PATH}/sounds/thunder.mp3`,
