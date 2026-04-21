@@ -1,8 +1,17 @@
 "use client";
 
 import { t } from "@/lib/i18n";
-import { TimerMode, TimerState, DailyGoal, EnsoTask } from "@/types";
+import { TimerMode, TimerState, DailyGoal, EnsoTask, AmbientSoundType } from "@/types";
 import { PlayIcon, PauseIcon, SkipIcon, ExpandIcon, SpeakerOnIcon, SpeakerOffIcon } from "@/components/shared/Icons";
+
+const AMBIENT_ICONS: Record<AmbientSoundType, string> = {
+  thunder: "⛈",
+  fire: "🔥",
+  cafe: "☕",
+  birds: "🐦",
+  waves: "🌊",
+};
+const AMBIENT_TYPES: AmbientSoundType[] = ["thunder", "fire", "cafe", "birds", "waves"];
 
 interface TimerHandle {
   secondsLeft: number;
@@ -25,6 +34,8 @@ interface Props {
   onEnterFullscreen: () => void;
   ambientEnabled: boolean;
   onAmbientToggle: () => void;
+  ambientType: AmbientSoundType;
+  onAmbientTypeChange: (type: AmbientSoundType) => void;
   dailyGoal: DailyGoal;
   todaySeconds: number;
   ensoTasks: EnsoTask[];
@@ -49,7 +60,7 @@ function ResetIcon({ size = 20 }: { size?: number }) {
 
 const PRIORITY_COLORS: Record<string, string> = { high: "text-red-400", medium: "text-amber-400", low: "text-emerald-400" };
 
-export default function FocusTab({ timer, focusMinutes, onFocusMinutesChange, onEnterFullscreen, ambientEnabled, onAmbientToggle, dailyGoal, todaySeconds, ensoTasks, selectedTaskId, onSelectTask }: Props) {
+export default function FocusTab({ timer, focusMinutes, onFocusMinutesChange, onEnterFullscreen, ambientEnabled, onAmbientToggle, ambientType, onAmbientTypeChange, dailyGoal, todaySeconds, ensoTasks, selectedTaskId, onSelectTask }: Props) {
   const { secondsLeft, totalSeconds, mode, state, start, pause, resume, reset, skip } = timer;
   const progress = totalSeconds > 0 ? (totalSeconds - secondsLeft) / totalSeconds : 0;
   const isFocus = mode === "focus";
@@ -170,19 +181,39 @@ export default function FocusTab({ timer, focusMinutes, onFocusMinutesChange, on
 
       {/* Sub controls (ambient + fullscreen) */}
       {state !== "idle" && (
-        <div className="mt-5 flex items-center gap-2">
-          <button onClick={onAmbientToggle}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-card border border-card text-xs transition-colors ${
-              ambientEnabled ? "text-emerald-500 border-emerald-500/20" : "text-muted hover:text-white"
-            }`}>
-            {ambientEnabled ? <SpeakerOnIcon size={14} /> : <SpeakerOffIcon size={14} />}
-            {t("settings.ambient")}
-          </button>
-          <button onClick={onEnterFullscreen}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-card border border-card text-xs text-muted hover:text-white transition-colors">
-            <ExpandIcon size={14} />
-            {t("focus.fullscreen")}
-          </button>
+        <div className="mt-5 flex flex-col items-center gap-2">
+          <div className="flex items-center gap-2">
+            <button onClick={onAmbientToggle}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-card border border-card text-xs transition-colors ${
+                ambientEnabled ? "text-emerald-500 border-emerald-500/20" : "text-muted hover:text-white"
+              }`}>
+              {ambientEnabled ? <SpeakerOnIcon size={14} /> : <SpeakerOffIcon size={14} />}
+              {t("settings.ambient")}
+            </button>
+            <button onClick={onEnterFullscreen}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-card border border-card text-xs text-muted hover:text-white transition-colors">
+              <ExpandIcon size={14} />
+              {t("focus.fullscreen")}
+            </button>
+          </div>
+          {ambientEnabled && (
+            <div className="flex items-center gap-2">
+              {AMBIENT_TYPES.map((type) => (
+                <button
+                  key={type}
+                  onClick={() => onAmbientTypeChange(type)}
+                  className={`w-9 h-9 rounded-full flex items-center justify-center text-lg transition-all ${
+                    ambientType === type
+                      ? "bg-emerald-500/20 border border-emerald-500/40 scale-110"
+                      : "bg-card border border-card opacity-50 hover:opacity-100"
+                  }`}
+                  title={type}
+                >
+                  {AMBIENT_ICONS[type]}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

@@ -175,6 +175,11 @@ function FocusInner() {
     setAmbientSettings(u); saveAmbientSettings(u);
   }, [ambientSettings]);
 
+  const handleAmbientTypeChange = useCallback((type: AmbientSettings["type"]) => {
+    const u = { ...ambientSettings, type };
+    setAmbientSettings(u); saveAmbientSettings(u);
+  }, [ambientSettings]);
+
   const handleEnterFullscreen = useCallback(() => {
     setIsFullscreen(true);
     document.documentElement.requestFullscreen?.().catch(() => {});
@@ -243,6 +248,8 @@ function FocusInner() {
           onEnterFullscreen={handleEnterFullscreen}
           ambientEnabled={ambientSettings.enabled}
           onAmbientToggle={handleAmbientToggle}
+          ambientType={ambientSettings.type}
+          onAmbientTypeChange={handleAmbientTypeChange}
           dailyGoal={dailyGoal}
           todaySeconds={todaySeconds}
           ensoTasks={ensoTasks}
