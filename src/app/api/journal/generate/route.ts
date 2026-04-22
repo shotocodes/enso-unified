@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { AI_MODEL } from "@/lib/ai";
 
 // ===== シンプルなインメモリ レートリミット =====
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
@@ -89,7 +90,7 @@ Rules:
         "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
-        model: "claude-haiku-4-5-20251001",
+        model: AI_MODEL,
         max_tokens: 300,
         messages: [{ role: "user", content: prompt }],
       }),
