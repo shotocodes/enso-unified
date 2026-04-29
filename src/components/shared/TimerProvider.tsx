@@ -17,9 +17,29 @@ import {
   recordFocusToJournal,
 } from "@/lib/storage";
 import { playCompletionSound, playAlert } from "@/lib/sound";
+import { t } from "@/lib/i18n";
 import { useTimer } from "@/hooks/useTimer";
 import { useAmbientSound } from "@/hooks/useAmbientSound";
 import CompletionModal from "@/components/focus/CompletionModal";
+
+function showSystemNotification(title: string, body: string) {
+  if (typeof window === "undefined") return;
+  if (typeof Notification === "undefined") return;
+  if (Notification.permission !== "granted") return;
+  if (document.visibilityState === "visible") return; // suppress when tab is already in focus
+  try {
+    new Notification(title, { body, icon: "/icon-192.png", tag: "enso-focus" });
+  } catch {
+    // some browsers throw on construction (e.g. iOS Safari without a service worker context)
+  }
+}
+
+function ensureNotificationPermission() {
+  if (typeof Notification === "undefined") return;
+  if (Notification.permission === "default") {
+    Notification.requestPermission().catch(() => {});
+  }
+}
 
 interface PendingSession {
   startedAt: string;
@@ -112,8 +132,10 @@ export default function TimerProvider({ children }: { children: React.ReactNode 
       setPendingSession({ startedAt: sessionStartRef.current, endedAt: now, duration });
       sessionStartRef.current = null;
       playCompletionSound(completionSound);
+      showSystemNotification(t("focus.sessionComplete"), t("focus.notify.focusBody"));
     } else if (mode === "break") {
       playAlert();
+      showSystemNotification(t("focus.breakComplete"), t("focus.notify.breakBody"));
     }
   }, [completionSound]);
 
@@ -193,13 +215,20 @@ export default function TimerProvider({ children }: { children: React.ReactNode 
     closeModal();
   }, [pendingSession, selectedTaskId, selectedTaskTitle, closeModal]);
 
+  // Wrap start so the first user gesture also requests notification permission.
+  // requestPermission is a no-op once already granted/denied — safe to call repeatedly.
+  const startWithPermission = useCallback(() => {
+    ensureNotificationPermission();
+    timer.start();
+  }, [timer]);
+
   const value = useMemo<TimerContextValue>(
     () => ({
       secondsLeft: timer.secondsLeft,
       totalSeconds: timer.totalSeconds,
       mode: timer.mode,
       state: timer.state,
-      start: timer.start,
+      start: startWithPermission,
       pause: timer.pause,
       resume: timer.resume,
       reset: timer.reset,
@@ -214,7 +243,7 @@ export default function TimerProvider({ children }: { children: React.ReactNode 
     }),
     [
       timer.secondsLeft, timer.totalSeconds, timer.mode, timer.state,
-      timer.start, timer.pause, timer.resume, timer.reset, timer.skip,
+      startWithPermission, timer.pause, timer.resume, timer.reset, timer.skip,
       timerConfig, updateTimerConfig,
       ambientSettings, updateAmbientSettings,
       selectedTaskId, selectedTaskTitle, setSelectedTask,

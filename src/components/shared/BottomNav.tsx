@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { t, type Locale } from "@/lib/i18n";
 import type { PageId } from "@/types";
+import { useTimerContext } from "./TimerProvider";
 
 interface Props {
   locale: Locale;
@@ -77,6 +78,10 @@ const NAV_ITEMS: NavItem[] = [
 
 export default function BottomNav({ locale }: Props) {
   const pathname = usePathname();
+  const { state: timerState, mode: timerMode } = useTimerContext();
+  const timerActive = timerState !== "idle";
+  const timerRunning = timerState === "running";
+  const indicatorColor = timerMode === "focus" ? "bg-emerald-500" : "bg-amber-500";
 
   return (
     <nav
@@ -87,6 +92,7 @@ export default function BottomNav({ locale }: Props) {
       <div className="max-w-lg mx-auto flex items-stretch justify-between">
         {NAV_ITEMS.map((item) => {
           const active = pathname === item.href || pathname.startsWith(item.href + "/");
+          const showIndicator = item.id === "focus" && timerActive;
           return (
             <Link
               key={item.id}
@@ -94,15 +100,23 @@ export default function BottomNav({ locale }: Props) {
               aria-label={t(item.labelKey, locale)}
               className="flex-1 flex flex-col items-center justify-center py-2.5 gap-1 transition-colors focus:outline-none"
             >
-              <svg
-                width={24}
-                height={24}
-                viewBox="0 0 100 100"
-                fill="none"
-                className={active ? "text-emerald-500" : "text-muted"}
-              >
-                {item.logo}
-              </svg>
+              <span className="relative inline-flex">
+                <svg
+                  width={24}
+                  height={24}
+                  viewBox="0 0 100 100"
+                  fill="none"
+                  className={active ? "text-emerald-500" : "text-muted"}
+                >
+                  {item.logo}
+                </svg>
+                {showIndicator && (
+                  <span
+                    className={`absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full ${indicatorColor} ${timerRunning ? "animate-timer-pulse" : ""}`}
+                    aria-hidden
+                  />
+                )}
+              </span>
               <span
                 className={`text-[10px] font-medium ${active ? "text-emerald-500" : "text-muted"}`}
               >

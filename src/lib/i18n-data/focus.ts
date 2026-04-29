@@ -24,6 +24,10 @@ export const focusTranslations: Record<string, Record<Locale, string>> = {
   "focus.breakComplete": { ja: "休憩終了！", en: "Break is over!", zh: "休息结束！", ko: "휴식 종료!" },
   "focus.ready": { ja: "集中する準備はできましたか？", en: "Ready to focus?", zh: "准备好专注了吗？", ko: "집중할 준비가 되었나요?" },
 
+  // Notifications
+  "focus.notify.focusBody": { ja: "お疲れ様！記録を残そう。", en: "Nice work! Log your session.", zh: "辛苦了！记录这次专注。", ko: "수고했어요! 기록을 남겨보세요." },
+  "focus.notify.breakBody": { ja: "次の集中を始めよう。", en: "Time to focus again.", zh: "开始下一轮专注吧。", ko: "다시 집중을 시작해요." },
+
   // History tab
   "history.title": { ja: "集中記録", en: "Focus History", zh: "专注记录", ko: "집중 기록" },
   "history.today": { ja: "今日", en: "Today", zh: "今天", ko: "오늘" },
