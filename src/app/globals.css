@@ -142,6 +142,36 @@ input[type="time"]::-webkit-calendar-picker-indicator {
   50%      { opacity: 0.4; }
 }
 
+/* PNG-friendly "drawing" reveal: a conic mask sweeps around the logo,
+   making the brushstroke appear as if being painted in real time.
+   Falls back gracefully (just fades in) on browsers without @property support. */
+@property --enso-sweep {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+
+@keyframes enso-reveal {
+  0%   { --enso-sweep: 0deg;   opacity: 0;    transform: scale(0.92); filter: blur(6px); }
+  20%  { opacity: 1;            transform: scale(0.96); filter: blur(2px); }
+  100% { --enso-sweep: 360deg; opacity: 1;    transform: scale(1);    filter: blur(0); }
+}
+
+@keyframes enso-breath {
+  0%, 100% { transform: scale(1);    filter: drop-shadow(0 0 16px rgba(16, 185, 129, 0.18)); }
+  50%      { transform: scale(1.015); filter: drop-shadow(0 0 28px rgba(16, 185, 129, 0.35)); }
+}
+
+@keyframes enso-orbit {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+@keyframes enso-orbit-reverse {
+  from { transform: rotate(360deg); }
+  to   { transform: rotate(0deg); }
+}
+
 /* ===== Animation utilities (must be inside @layer for Tailwind v4) ===== */
 
 @layer utilities {
@@ -165,6 +195,23 @@ input[type="time"]::-webkit-calendar-picker-indicator {
     stroke-dashoffset: 201;
     animation: draw-circle 2s cubic-bezier(0.4, 0, 0.2, 1) 0.3s forwards;
   }
+
+  /* PNG enso brand mark: paints itself in via conic mask starting at the bottom
+     (6 o'clock), sweeping clockwise — matches a calligrapher's brush direction
+     (bottom-left → up the left → over the top → down the right → tail at bottom-right).
+     After the reveal, breathes gently. */
+  .animate-enso-reveal {
+    --enso-sweep: 0deg;
+    -webkit-mask: conic-gradient(from 180deg, #000 var(--enso-sweep), transparent calc(var(--enso-sweep) + 0.5deg));
+            mask: conic-gradient(from 180deg, #000 var(--enso-sweep), transparent calc(var(--enso-sweep) + 0.5deg));
+    animation:
+      enso-reveal  1.8s cubic-bezier(0.4, 0, 0.2, 1) 0.1s both,
+      enso-breath  6s   ease-in-out                  2s   infinite;
+  }
+
+  /* Decorative orbit rings that sit on top of the logo, rotating in opposite directions. */
+  .animate-enso-orbit         { animation: enso-orbit 24s linear infinite; }
+  .animate-enso-orbit-reverse { animation: enso-orbit-reverse 36s linear infinite; }
 
   /* App icon idle animations */
   .animate-timer-hand        { animation: timer-rotate 8s linear infinite; }

@@ -75,17 +75,42 @@ export default function LandingPage() {
 
       {/* ━━ A. Hero ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
       <section className="h-screen flex flex-col items-center justify-center px-6 relative">
-        {/* Animated Enso circle */}
-        <svg width={120} height={120} viewBox="0 0 100 100" fill="none" className="mb-8">
-          <circle
-            cx="50" cy="50" r="32"
-            stroke="#10b981"
-            strokeWidth="4"
+        {/* Animated Enso brand mark */}
+        <div className="relative w-[260px] h-[260px] sm:w-[320px] sm:h-[320px] mb-6 select-none pointer-events-none">
+          {/* Outer counter-rotating ring (decorative, subtle) */}
+          <svg
+            viewBox="0 0 100 100"
+            className="absolute inset-0 w-full h-full text-emerald-500/40 animate-enso-orbit-reverse"
             fill="none"
-            strokeLinecap="round"
-            className="animate-draw-circle"
+            aria-hidden
+          >
+            <circle cx="50" cy="50" r="46" stroke="currentColor" strokeWidth="0.3" strokeDasharray="0.5 1.5" />
+          </svg>
+
+          {/* The brushstroke logo, painted in by a conic mask */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/enso-mark.png"
+            alt="ENSO"
+            className="absolute inset-0 w-full h-full object-contain animate-enso-reveal"
+            draggable={false}
           />
-        </svg>
+
+          {/* Inner orbiting particle: keeps the hero "alive" after the reveal completes */}
+          <svg
+            viewBox="0 0 100 100"
+            className="absolute inset-0 w-full h-full animate-enso-orbit"
+            fill="none"
+            aria-hidden
+          >
+            <circle cx="50" cy="6" r="1.1" fill="#10b981" opacity="0.9">
+              <animate attributeName="opacity" values="0.9;0.3;0.9" dur="3s" repeatCount="indefinite" />
+            </circle>
+            <circle cx="50" cy="94" r="0.7" fill="#10b981" opacity="0.5">
+              <animate attributeName="opacity" values="0.5;0.15;0.5" dur="3s" begin="1.5s" repeatCount="indefinite" />
+            </circle>
+          </svg>
+        </div>
 
         <h1 className="animate-fade-in text-5xl sm:text-7xl font-bold tracking-tight text-center">
           ENSO
