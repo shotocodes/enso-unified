@@ -35,3 +35,6 @@ yarn-error.log*
 # Claude
 .claude/
 .vercel
+
+# Raw image masters (not deployed; large source files for the brand mark)
+/_assets-raw/

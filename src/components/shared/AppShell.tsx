@@ -13,6 +13,7 @@ import { setLocale as setI18nLocale, type Locale } from "@/lib/i18n";
 import type { ThemeMode } from "@/types";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import BottomNav from "./BottomNav";
+import TimerProvider from "./TimerProvider";
 
 // ================================================
 // App Context: theme + locale + optional user
@@ -166,10 +167,12 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <AppContext.Provider value={value}>
-      <div className={showNav ? "pb-[calc(64px+env(safe-area-inset-bottom))]" : ""}>
-        {children}
-      </div>
-      {showNav && mounted && <BottomNav locale={locale} />}
+      <TimerProvider>
+        <div className={showNav ? "pb-[calc(64px+env(safe-area-inset-bottom))]" : ""}>
+          {children}
+        </div>
+        {showNav && mounted && <BottomNav locale={locale} />}
+      </TimerProvider>
     </AppContext.Provider>
   );
 }

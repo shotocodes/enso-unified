@@ -1,30 +1,20 @@
 "use client";
 
-import { Suspense, useState, useEffect, useCallback, useRef } from "react";
+import { Suspense, useState, useEffect, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
-import type {
-  AmbientSettings, CompletionSoundType, CustomTag, DailyGoal, EnsoTask, TimerConfig, TimerMode,
-} from "@/types";
-import { DEFAULT_TAGS, DEFAULT_TIMER_CONFIG } from "@/types";
+import type { DailyGoal, EnsoTask } from "@/types";
 import { t } from "@/lib/i18n";
 import {
-  getTimerConfig, saveTimerConfig,
-  getAmbientSettings, saveAmbientSettings,
-  getCompletionSound,
   getDailyGoal,
-  getFocusTags,
-  addFocusSession, getFocusStats,
-  getEnsoTasksForFocus, recordFocusToJournal,
+  getEnsoTasksForFocus,
+  getFocusStats,
 } from "@/lib/storage";
-import { playCompletionSound, playAlert } from "@/lib/sound";
 import { useAppShell } from "@/components/shared/AppShell";
+import { useTimerContext } from "@/components/shared/TimerProvider";
 import PageHeader from "@/components/shared/PageHeader";
 import FocusTab from "@/components/focus/tabs/FocusTab";
 import HistoryTab from "@/components/focus/tabs/HistoryTab";
 import FullscreenFocus from "@/components/focus/FullscreenFocus";
-import CompletionModal from "@/components/focus/CompletionModal";
-import { useTimer } from "@/hooks/useTimer";
-import { useAmbientSound } from "@/hooks/useAmbientSound";
 
 type TabId = "focus" | "history";
 
@@ -38,147 +28,59 @@ export default function FocusPage() {
 
 function FocusInner() {
   const { locale, mounted } = useAppShell();
+  const ctx = useTimerContext();
   const searchParams = useSearchParams();
 
   const [activeTab, setActiveTab] = useState<TabId>("focus");
-  const [timerConfig, setTimerConfig] = useState<TimerConfig>(DEFAULT_TIMER_CONFIG);
-  const [ambientSettings, setAmbientSettings] = useState<AmbientSettings>({ enabled: false, type: "thunder", volume: 0.3 });
-  const [completionSound, setCompletionSound] = useState<CompletionSoundType>("celebration");
   const [dailyGoal, setDailyGoal] = useState<DailyGoal>({ minutes: 0 });
-  const [tags, setTags] = useState<CustomTag[]>(DEFAULT_TAGS);
-  const [isFullscreen, setIsFullscreen] = useState(false);
-  const [sessionVersion, setSessionVersion] = useState(0);
   const [todaySeconds, setTodaySeconds] = useState(0);
-
   const [ensoTasks, setEnsoTasks] = useState<EnsoTask[]>([]);
-  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const [sessionVersion, setSessionVersion] = useState(0);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
-  const [showCompletionModal, setShowCompletionModal] = useState(false);
-  const [pendingSessionData, setPendingSessionData] = useState<{
-    startedAt: string; endedAt: string; duration: number;
-  } | null>(null);
-
-  const sessionStartRef = useRef<string | null>(null);
-
-  const handleTimerComplete = useCallback((mode: TimerMode) => {
-    if (mode === "focus" && sessionStartRef.current) {
-      const now = new Date().toISOString();
-      const duration = Math.round((Date.now() - new Date(sessionStartRef.current).getTime()) / 1000);
-      setPendingSessionData({ startedAt: sessionStartRef.current, endedAt: now, duration });
-      sessionStartRef.current = null;
-      setShowCompletionModal(true);
-      playCompletionSound(completionSound);
-    } else if (mode === "break") {
-      playAlert();
-    }
-  }, [completionSound]);
-
-  const timer = useTimer({ config: timerConfig, onComplete: handleTimerComplete });
-
-  useAmbientSound({
-    enabled: ambientSettings.enabled, type: ambientSettings.type,
-    volume: ambientSettings.volume, isPlaying: timer.state === "running", mode: timer.mode,
-  });
-
-  // Track session start
+  // Initial load + listeners
   useEffect(() => {
-    if (timer.state === "running" && timer.mode === "focus" && !sessionStartRef.current) {
-      sessionStartRef.current = new Date().toISOString();
-    }
-    if (timer.state === "idle" && timer.mode === "focus") {
-      sessionStartRef.current = null;
-    }
-  }, [timer.state, timer.mode]);
-
-  // Initial load
-  useEffect(() => {
-    setTimerConfig(getTimerConfig());
-    setAmbientSettings(getAmbientSettings());
-    setCompletionSound(getCompletionSound());
     setDailyGoal(getDailyGoal());
-    setTags(getFocusTags());
     setTodaySeconds(getFocusStats().today);
-
-    const loadedTasks = getEnsoTasksForFocus();
-    setEnsoTasks(loadedTasks);
+    const tasks = getEnsoTasksForFocus();
+    setEnsoTasks(tasks);
 
     // Auto-select task from ?taskId=xxx
     const taskIdParam = searchParams.get("taskId");
-    if (taskIdParam && loadedTasks.some((t) => t.id === taskIdParam)) {
-      setSelectedTaskId(taskIdParam);
-      setActiveTab("focus");
+    if (taskIdParam) {
+      const task = tasks.find((tk) => tk.id === taskIdParam);
+      if (task) {
+        ctx.setSelectedTask(task.id, task.title);
+        setActiveTab("focus");
+      }
     }
 
     const handleVisibility = () => {
-      if (document.visibilityState === "visible") setEnsoTasks(getEnsoTasksForFocus());
+      if (document.visibilityState === "visible") {
+        setEnsoTasks(getEnsoTasksForFocus());
+        setTodaySeconds(getFocusStats().today);
+      }
     };
     const handleRemoteChange = () => {
       setEnsoTasks(getEnsoTasksForFocus());
       setTodaySeconds(getFocusStats().today);
+      setDailyGoal(getDailyGoal());
+    };
+    const handleSessionRecorded = () => {
+      setTodaySeconds(getFocusStats().today);
+      setSessionVersion((v) => v + 1);
     };
     document.addEventListener("visibilitychange", handleVisibility);
     window.addEventListener("enso:remote-change", handleRemoteChange);
+    window.addEventListener("enso:focus-session-recorded", handleSessionRecorded);
     return () => {
       document.removeEventListener("visibilitychange", handleVisibility);
       window.removeEventListener("enso:remote-change", handleRemoteChange);
+      window.removeEventListener("enso:focus-session-recorded", handleSessionRecorded);
     };
+    // ctx is stable from provider (memoized callbacks); intentionally exclude to avoid re-binding
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
-
-  // Refresh today's seconds when sessionVersion changes
-  useEffect(() => {
-    setTodaySeconds(getFocusStats().today);
-  }, [sessionVersion]);
-
-  const selectedTask = ensoTasks.find((task) => task.id === selectedTaskId);
-
-  const handleMemoSave = useCallback((data: { memo: string; tag?: string }) => {
-    if (pendingSessionData) {
-      addFocusSession({
-        ...pendingSessionData,
-        memo: data.memo || undefined,
-        tag: data.tag,
-        taskId: selectedTaskId ?? undefined,
-        taskTitle: selectedTask?.title,
-      });
-      setSessionVersion((v) => v + 1);
-      const durationMin = Math.round(pendingSessionData.duration / 60);
-      const tagName = data.tag ? tags.find((tg) => tg.id === data.tag)?.name || data.tag : null;
-      const label = data.memo || selectedTask?.title || tagName || "Focus";
-      recordFocusToJournal(label, durationMin);
-    }
-    setPendingSessionData(null);
-    setShowCompletionModal(false);
-    setSelectedTaskId(null);
-    if (timerConfig.autoStartBreak) timer.startBreak();
-  }, [pendingSessionData, selectedTaskId, selectedTask, tags, timerConfig.autoStartBreak, timer]);
-
-  const handleMemoSkip = useCallback(() => {
-    if (pendingSessionData) {
-      addFocusSession({
-        ...pendingSessionData,
-        taskId: selectedTaskId ?? undefined,
-        taskTitle: selectedTask?.title,
-      });
-      setSessionVersion((v) => v + 1);
-      const durationMin = Math.round(pendingSessionData.duration / 60);
-      const label = selectedTask?.title || "Focus";
-      recordFocusToJournal(label, durationMin);
-    }
-    setPendingSessionData(null);
-    setShowCompletionModal(false);
-    setSelectedTaskId(null);
-    if (timerConfig.autoStartBreak) timer.startBreak();
-  }, [pendingSessionData, selectedTaskId, selectedTask, timerConfig.autoStartBreak, timer]);
-
-  const handleAmbientToggle = useCallback(() => {
-    const u = { ...ambientSettings, enabled: !ambientSettings.enabled };
-    setAmbientSettings(u); saveAmbientSettings(u);
-  }, [ambientSettings]);
-
-  const handleAmbientTypeChange = useCallback((type: AmbientSettings["type"]) => {
-    const u = { ...ambientSettings, type };
-    setAmbientSettings(u); saveAmbientSettings(u);
-  }, [ambientSettings]);
 
   const handleEnterFullscreen = useCallback(() => {
     setIsFullscreen(true);
@@ -196,19 +98,28 @@ function FocusInner() {
     return () => document.removeEventListener("fullscreenchange", handler);
   }, []);
 
+  const handleSelectTask = useCallback((id: string | null) => {
+    if (id === null) {
+      ctx.setSelectedTask(null, null);
+      return;
+    }
+    const task = ensoTasks.find((tk) => tk.id === id);
+    ctx.setSelectedTask(id, task?.title ?? null);
+  }, [ctx, ensoTasks]);
+
   if (!mounted) return null;
 
   if (isFullscreen) {
     return (
       <FullscreenFocus
-        secondsLeft={timer.secondsLeft}
-        totalSeconds={timer.totalSeconds}
-        mode={timer.mode}
-        state={timer.state}
-        onPause={timer.pause}
-        onResume={timer.resume}
-        onReset={timer.reset}
-        onSkip={timer.skip}
+        secondsLeft={ctx.secondsLeft}
+        totalSeconds={ctx.totalSeconds}
+        mode={ctx.mode}
+        state={ctx.state}
+        onPause={ctx.pause}
+        onResume={ctx.resume}
+        onReset={ctx.reset}
+        onSkip={ctx.skip}
         onExit={handleExitFullscreen}
       />
     );
@@ -238,36 +149,32 @@ function FocusInner() {
       {activeTab === "focus" && (
         <FocusTab
           key={locale}
-          timer={timer}
-          focusMinutes={timerConfig.focusMinutes}
-          onFocusMinutesChange={(m) => {
-            const next = { ...timerConfig, focusMinutes: m };
-            setTimerConfig(next);
-            saveTimerConfig(next);
+          timer={{
+            secondsLeft: ctx.secondsLeft,
+            totalSeconds: ctx.totalSeconds,
+            mode: ctx.mode,
+            state: ctx.state,
+            start: ctx.start,
+            pause: ctx.pause,
+            resume: ctx.resume,
+            reset: ctx.reset,
+            skip: ctx.skip,
           }}
+          focusMinutes={ctx.timerConfig.focusMinutes}
+          onFocusMinutesChange={(m) => ctx.updateTimerConfig({ ...ctx.timerConfig, focusMinutes: m })}
           onEnterFullscreen={handleEnterFullscreen}
-          ambientEnabled={ambientSettings.enabled}
-          onAmbientToggle={handleAmbientToggle}
-          ambientType={ambientSettings.type}
-          onAmbientTypeChange={handleAmbientTypeChange}
+          ambientEnabled={ctx.ambientSettings.enabled}
+          onAmbientToggle={() => ctx.updateAmbientSettings({ ...ctx.ambientSettings, enabled: !ctx.ambientSettings.enabled })}
+          ambientType={ctx.ambientSettings.type}
+          onAmbientTypeChange={(type) => ctx.updateAmbientSettings({ ...ctx.ambientSettings, type })}
           dailyGoal={dailyGoal}
           todaySeconds={todaySeconds}
           ensoTasks={ensoTasks}
-          selectedTaskId={selectedTaskId}
-          onSelectTask={setSelectedTaskId}
+          selectedTaskId={ctx.selectedTaskId}
+          onSelectTask={handleSelectTask}
         />
       )}
       {activeTab === "history" && <HistoryTab key={`${locale}-${sessionVersion}`} />}
-
-      {showCompletionModal && pendingSessionData && (
-        <CompletionModal
-          duration={pendingSessionData.duration}
-          tags={tags}
-          defaultMemo={selectedTask?.title}
-          onSave={handleMemoSave}
-          onSkip={handleMemoSkip}
-        />
-      )}
     </main>
   );
 }

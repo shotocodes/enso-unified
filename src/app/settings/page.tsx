@@ -73,12 +73,16 @@ export default function SettingsPage() {
 
   // ===== Save handlers =====
 
-  const saveTick = useCallback((next: SoundSettings) => { setTickSettings(next); saveSoundSettings(next); }, []);
-  const saveTimer = useCallback((next: TimerConfig) => { setTimerConfig(next); saveTimerConfig(next); }, []);
-  const saveAmbientCfg = useCallback((next: AmbientSettings) => { setAmbient(next); saveAmbientSettings(next); }, []);
-  const saveCompletion = useCallback((s: CompletionSoundType) => { setCompletionSound(s); saveCompletionSound(s); playCompletionSound(s); }, []);
-  const saveGoal = useCallback((g: DailyGoal) => { setDailyGoal(g); saveDailyGoal(g); }, []);
-  const saveTagsList = useCallback((list: CustomTag[]) => { setTags(list); saveFocusTags(list); }, []);
+  const notifySettingsChanged = useCallback(() => {
+    window.dispatchEvent(new CustomEvent("enso:settings-changed"));
+  }, []);
+
+  const saveTick = useCallback((next: SoundSettings) => { setTickSettings(next); saveSoundSettings(next); notifySettingsChanged(); }, [notifySettingsChanged]);
+  const saveTimer = useCallback((next: TimerConfig) => { setTimerConfig(next); saveTimerConfig(next); notifySettingsChanged(); }, [notifySettingsChanged]);
+  const saveAmbientCfg = useCallback((next: AmbientSettings) => { setAmbient(next); saveAmbientSettings(next); notifySettingsChanged(); }, [notifySettingsChanged]);
+  const saveCompletion = useCallback((s: CompletionSoundType) => { setCompletionSound(s); saveCompletionSound(s); playCompletionSound(s); notifySettingsChanged(); }, [notifySettingsChanged]);
+  const saveGoal = useCallback((g: DailyGoal) => { setDailyGoal(g); saveDailyGoal(g); notifySettingsChanged(); }, [notifySettingsChanged]);
+  const saveTagsList = useCallback((list: CustomTag[]) => { setTags(list); saveFocusTags(list); notifySettingsChanged(); }, [notifySettingsChanged]);
 
   // ===== Data export/import =====
 
