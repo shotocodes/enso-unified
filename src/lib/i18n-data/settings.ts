@@ -50,7 +50,12 @@ export const settingsTranslations: Record<string, Record<Locale, string>> = {
   "settings.notifBlocked": { ja: "通知はブロックされています", en: "Notifications blocked", zh: "通知已被阻止", ko: "알림이 차단되었습니다" },
   "settings.notifAsk": { ja: "通知を有効にしますか？", en: "Enable notifications?", zh: "启用通知？", ko: "알림을 활성화하시겠습니까?" },
   "settings.enable": { ja: "有効にする", en: "Enable", zh: "启用", ko: "활성화" },
+  "settings.disable": { ja: "無効にする", en: "Disable", zh: "禁用", ko: "비활성화" },
   "settings.notifUnsupported": { ja: "このブラウザは通知に対応していません", en: "This browser doesn't support notifications", zh: "此浏览器不支持通知", ko: "이 브라우저는 알림을 지원하지 않습니다" },
+  "settings.pushTitle": { ja: "プッシュ通知", en: "Push Notifications", zh: "推送通知", ko: "푸시 알림" },
+  "settings.pushOn": { ja: "目標期限が近づくと通知が届きます", en: "You'll get a push when your goal deadlines approach", zh: "目标接近截止时会收到推送", ko: "목표 기한이 다가오면 푸시 알림이 옵니다" },
+  "settings.pushOff": { ja: "アプリを閉じていても目標期限を通知できます", en: "Get reminded about goal deadlines even when ENSO is closed", zh: "应用关闭时也能收到目标截止通知", ko: "앱을 닫아도 목표 기한 알림을 받을 수 있어요" },
+  "settings.pushSignInRequired": { ja: "プッシュ通知を有効にするには Google ログインが必要です", en: "Sign in with Google to enable push notifications", zh: "需要使用 Google 登录以启用推送通知", ko: "푸시 알림을 활성화하려면 Google 로그인이 필요해요" },
 
   // Life timer
   "settings.lifeTimer": { ja: "人生タイマー", en: "Life Timer", zh: "人生计时器", ko: "인생 타이머" },

@@ -25,6 +25,7 @@ import {
   exportAllData, importAllData, clearAllData,
 } from "@/lib/storage";
 import { previewSound, playCompletionSound } from "@/lib/sound";
+import { detectPushSupport, enablePush, disablePush, isPushSubscribed } from "@/lib/push";
 import { useAppShell } from "@/components/shared/AppShell";
 import EnsoLogo from "@/components/shared/EnsoLogo";
 import {
@@ -53,6 +54,9 @@ export default function SettingsPage() {
 
   // Notifications permission UI
   const [notifPerm, setNotifPerm] = useState<NotificationPermission | "unsupported">("default");
+  const [pushSubscribed, setPushSubscribed] = useState(false);
+  const [pushBusy, setPushBusy] = useState(false);
+  const [pushError, setPushError] = useState<string | null>(null);
 
   // Import / clear UI state
   const fileRef = useRef<HTMLInputElement>(null);
@@ -69,7 +73,24 @@ export default function SettingsPage() {
     setLifeConfig(getLifeConfig());
     if (typeof Notification !== "undefined") setNotifPerm(Notification.permission);
     else setNotifPerm("unsupported");
+    isPushSubscribed().then(setPushSubscribed);
   }, []);
+
+  const handleTogglePush = useCallback(async () => {
+    if (!user) return;
+    setPushBusy(true);
+    setPushError(null);
+    const result = pushSubscribed
+      ? await disablePush(user.id)
+      : await enablePush(user.id);
+    if (result.ok) {
+      setPushSubscribed(!pushSubscribed);
+      setNotifPerm(typeof Notification !== "undefined" ? Notification.permission : "unsupported");
+    } else {
+      setPushError(result.reason);
+    }
+    setPushBusy(false);
+  }, [user, pushSubscribed]);
 
   // ===== Save handlers =====
 
@@ -309,22 +330,39 @@ export default function SettingsPage() {
         <Section title={t("settings.section.notifications", locale)} description={t("settings.section.notifications.desc", locale)}>
           {notifPerm === "unsupported" ? (
             <p className="text-xs text-muted">{t("settings.notifUnsupported", locale)}</p>
+          ) : !user ? (
+            <p className="text-xs text-muted">{t("settings.pushSignInRequired", locale)}</p>
           ) : (
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-muted">
-                {notifPerm === "granted"
-                  ? t("settings.notifEnabled", locale)
-                  : notifPerm === "denied"
-                  ? t("settings.notifBlocked", locale)
-                  : t("settings.notifAsk", locale)}
-              </span>
-              {notifPerm === "default" && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium">{t("settings.pushTitle", locale)}</p>
+                  <p className="text-xs text-muted mt-0.5">
+                    {pushSubscribed
+                      ? t("settings.pushOn", locale)
+                      : notifPerm === "denied"
+                      ? t("settings.notifBlocked", locale)
+                      : t("settings.pushOff", locale)}
+                  </p>
+                </div>
                 <button
-                  onClick={() => Notification.requestPermission().then(setNotifPerm)}
-                  className="text-xs text-emerald-500 font-bold"
+                  onClick={handleTogglePush}
+                  disabled={pushBusy || (notifPerm === "denied" && !pushSubscribed) || !detectPushSupport().supported}
+                  className={`text-xs font-bold px-3 py-1.5 rounded-full transition-colors ${
+                    pushSubscribed
+                      ? "bg-emerald-500/15 text-emerald-500 hover:bg-emerald-500/25"
+                      : "bg-card border border-card text-muted hover:text-emerald-500 hover:border-emerald-500/30"
+                  } disabled:opacity-50 disabled:cursor-not-allowed`}
                 >
-                  {t("settings.enable", locale)}
+                  {pushBusy ? "..." : pushSubscribed ? t("settings.disable", locale) : t("settings.enable", locale)}
                 </button>
+              </div>
+              {pushError && (
+                <p className="text-xs text-red-400">
+                  {pushError === "permission-denied"
+                    ? t("settings.notifBlocked", locale)
+                    : pushError}
+                </p>
               )}
             </div>
           )}
