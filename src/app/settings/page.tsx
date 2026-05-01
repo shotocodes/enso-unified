@@ -26,6 +26,7 @@ import {
 } from "@/lib/storage";
 import { previewSound, playCompletionSound } from "@/lib/sound";
 import { detectPushSupport, enablePush, disablePush, isPushSubscribed } from "@/lib/push";
+import { deleteAccount } from "@/lib/account";
 import { useAppShell } from "@/components/shared/AppShell";
 import EnsoLogo from "@/components/shared/EnsoLogo";
 import {
@@ -62,6 +63,13 @@ export default function SettingsPage() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [importMsg, setImportMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
+
+  // Account deletion UI state — kept separate from "clear local" so the user
+  // can never trigger the irreversible cloud delete by accident.
+  const [showDeleteAccount, setShowDeleteAccount] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   useEffect(() => {
     setTickSettings(getSoundSettings());
@@ -137,6 +145,20 @@ export default function SettingsPage() {
   const handleClearAll = useCallback(() => {
     clearAllData();
     window.location.reload();
+  }, []);
+
+  const handleDeleteAccount = useCallback(async () => {
+    setDeleteBusy(true);
+    setDeleteError(null);
+    const result = await deleteAccount();
+    if (result.ok) {
+      // Account is gone — bounce to the LP. Service worker keeps the SPA cache
+      // around but middleware will redirect any protected pages back to /.
+      window.location.href = "/";
+    } else {
+      setDeleteError(result.reason);
+      setDeleteBusy(false);
+    }
   }, []);
 
   if (!mounted) return null;
@@ -473,6 +495,63 @@ export default function SettingsPage() {
             </div>
           )}
         </Section>
+
+        {/* Danger zone — fully delete the cloud account + every public.* row.
+            Requires the user to type their email to confirm so it's never a
+            single misclick away. Only shows for signed-in users since there's
+            nothing on the server to delete otherwise. */}
+        {user && (
+          <Section title={t("settings.section.danger", locale)} description={t("settings.section.danger.desc", locale)}>
+            {!showDeleteAccount ? (
+              <button
+                onClick={() => { setShowDeleteAccount(true); setDeleteConfirmText(""); setDeleteError(null); }}
+                className="w-full text-center text-xs text-red-400/70 hover:text-red-400 py-2 transition-colors"
+              >
+                {t("settings.deleteAccount", locale)}
+              </button>
+            ) : (
+              <div className="bg-red-500/5 border border-red-500/20 rounded-lg p-3 space-y-3">
+                <div>
+                  <p className="text-xs font-bold text-red-400 mb-1">{t("settings.deleteAccountConfirm", locale)}</p>
+                  <p className="text-[11px] text-muted leading-relaxed">{t("settings.deleteAccountWarning", locale)}</p>
+                </div>
+                <div>
+                  <label className="text-[10px] text-muted uppercase tracking-wider block mb-1">
+                    {t("settings.deleteAccountTypeEmail", locale)}
+                  </label>
+                  <input
+                    type="text"
+                    autoComplete="off"
+                    value={deleteConfirmText}
+                    onChange={(e) => setDeleteConfirmText(e.target.value)}
+                    placeholder={user.email ?? ""}
+                    className="w-full bg-input border border-input rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-red-400"
+                    disabled={deleteBusy}
+                  />
+                </div>
+                {deleteError && (
+                  <p className="text-[11px] text-red-400">{deleteError}</p>
+                )}
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => { setShowDeleteAccount(false); setDeleteConfirmText(""); setDeleteError(null); }}
+                    disabled={deleteBusy}
+                    className="flex-1 py-2 rounded-lg text-xs bg-subtle text-muted disabled:opacity-50"
+                  >
+                    {t("settings.cancel", locale)}
+                  </button>
+                  <button
+                    onClick={handleDeleteAccount}
+                    disabled={deleteBusy || deleteConfirmText.trim().toLowerCase() !== (user.email ?? "").trim().toLowerCase()}
+                    className="flex-1 py-2 rounded-lg text-xs font-bold bg-red-500 text-white hover:bg-red-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    {deleteBusy ? "..." : t("settings.deleteAccountConfirmButton", locale)}
+                  </button>
+                </div>
+              </div>
+            )}
+          </Section>
+        )}
 
         {/* About */}
         <Section title={t("settings.section.about", locale)}>
