@@ -28,6 +28,9 @@ export function useTimer({ config, onComplete }: UseTimerOptions): UseTimerRetur
   const [secondsLeft, setSecondsLeft] = useState(totalSeconds);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startTimeRef = useRef<string | null>(null);
+  // Wall-clock target end (Date.now() ms). Set when running; null when paused/idle.
+  // Drives remaining-time calculation so background throttling can't desync the timer.
+  const endsAtRef = useRef<number | null>(null);
 
   // Sync secondsLeft when config or mode changes while idle
   useEffect(() => {
@@ -43,30 +46,41 @@ export function useTimer({ config, onComplete }: UseTimerOptions): UseTimerRetur
     }
   }, []);
 
-  // Tick
+  const recompute = useCallback(() => {
+    if (endsAtRef.current === null) return;
+    const remaining = Math.max(0, Math.ceil((endsAtRef.current - Date.now()) / 1000));
+    setSecondsLeft(remaining);
+    if (remaining === 0) clearTimer();
+  }, [clearTimer]);
+
+  // Tick — recompute from wall clock instead of decrementing, so background
+  // throttling/suspension self-corrects on the next tick.
   useEffect(() => {
     if (state !== "running") {
       clearTimer();
       return;
     }
-
-    intervalRef.current = setInterval(() => {
-      setSecondsLeft((prev) => {
-        if (prev <= 1) {
-          clearTimer();
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
+    recompute();
+    intervalRef.current = setInterval(recompute, 250);
     return clearTimer;
-  }, [state, clearTimer]);
+  }, [state, clearTimer, recompute]);
+
+  // Re-sync immediately when the page becomes visible — covers PWA backgrounded
+  // on the home screen, where setInterval is paused entirely.
+  useEffect(() => {
+    if (state !== "running") return;
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") recompute();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => document.removeEventListener("visibilitychange", onVisibility);
+  }, [state, recompute]);
 
   // Handle completion
   useEffect(() => {
     if (secondsLeft === 0 && state === "running") {
       const completedMode = mode;
+      endsAtRef.current = null;
       setState("idle");
       onComplete(completedMode);
 
@@ -84,26 +98,42 @@ export function useTimer({ config, onComplete }: UseTimerOptions): UseTimerRetur
 
   const startBreak = useCallback(() => {
     if (mode === "break" && state === "idle") {
-      setState("running");
+      const total = config.breakMinutes * 60;
+      endsAtRef.current = Date.now() + total * 1000;
       startTimeRef.current = new Date().toISOString();
+      setSecondsLeft(total);
+      setState("running");
     }
-  }, [mode, state]);
+  }, [mode, state, config.breakMinutes]);
 
   const start = useCallback(() => {
+    const total = mode === "focus" ? config.focusMinutes * 60 : config.breakMinutes * 60;
+    endsAtRef.current = Date.now() + total * 1000;
     startTimeRef.current = new Date().toISOString();
+    setSecondsLeft(total);
     setState("running");
-  }, []);
+  }, [mode, config.focusMinutes, config.breakMinutes]);
 
   const pause = useCallback(() => {
+    if (endsAtRef.current !== null) {
+      const remaining = Math.max(0, Math.ceil((endsAtRef.current - Date.now()) / 1000));
+      setSecondsLeft(remaining);
+      endsAtRef.current = null;
+    }
     setState("paused");
   }, []);
 
   const resume = useCallback(() => {
+    setSecondsLeft((prev) => {
+      endsAtRef.current = Date.now() + prev * 1000;
+      return prev;
+    });
     setState("running");
   }, []);
 
   const reset = useCallback(() => {
     clearTimer();
+    endsAtRef.current = null;
     setState("idle");
     setMode("focus");
     setSecondsLeft(config.focusMinutes * 60);
@@ -112,6 +142,7 @@ export function useTimer({ config, onComplete }: UseTimerOptions): UseTimerRetur
 
   const skip = useCallback(() => {
     clearTimer();
+    endsAtRef.current = null;
     // If skipping focus, still fire onComplete for recording
     if (mode === "focus" && state === "running") {
       onComplete(mode);
